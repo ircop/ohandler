@@ -1,0 +1,15 @@
+[nats]
+url = "nats://discoverer:password@127.0.0.1"
+tasks-chan = "tasks"
+replies-chan = "replies"
+
+[log]
+dir = "/var/log/ohandler/"
+debug = true
+
+[db]
+host = "127.0.0.1"
+port = 6432
+name = "nms"
+user = "nms"
+password = "password"
