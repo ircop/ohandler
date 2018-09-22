@@ -14,6 +14,7 @@ func getRouter() *mux.Router {
 	router.HandleFunc("/login", obs(&controllers.AuthController{}))
 	router.HandleFunc("/objects", obs(&controllers.ObjectsController{}))
 	router.HandleFunc("/object", obs(&controllers.ObjectController{}))
+	router.HandleFunc("/auth-profiles", obs(&controllers.AuthProfileController{}))
 
 	router.Use(middleware)
 	return router
