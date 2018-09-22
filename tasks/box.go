@@ -22,6 +22,15 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	dbo := obj.DbObject
 	obj.MX.Unlock()
 
+	if IsBoxRunning(dbo.ID) {
+		logger.Err("%s: box discovery already running.", dbo.Name)
+		return
+	}
+	BoxRunning.Store(dbo.ID, true)
+	defer func() {
+		BoxRunning.Delete(dbo.ID)
+	}()
+
 	logger.Debug("Running box discovery for %s (%s)", dbo.Name, dbo.Mgmt)
 	if !dbo.Alive {
 		logger.Log("Skipping box discovery for %s: !alive", dbo.Name)
