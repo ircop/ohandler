@@ -25,7 +25,7 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	logger.Debug("Running box discovery for %s (%s)", dbo.Name, dbo.Mgmt)
 	if !dbo.Alive {
 		logger.Log("Skipping box discovery for %s: !alive", dbo.Name)
-		scheduleBox(obj)
+		scheduleBox(obj, false)
 		return
 	}
 
@@ -33,7 +33,7 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	apInt, ok := handler.AuthProfiles.Load(dbo.AuthID)
 	if !ok {
 		logger.Err("No auth profile for object %d found!", dbo.ID)
-		scheduleBox(obj)
+		scheduleBox(obj, false)
 		return
 	}
 	ap := apInt.(models.AuthProfile)
@@ -47,7 +47,7 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	profile, err := dbo.GetProfile()
 	if err != nil {
 		logger.Err("%s: %s", dbo.Name, err.Error())
-		scheduleBox(obj)
+		scheduleBox(obj, false)
 		return
 	}
 
@@ -55,15 +55,15 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	streamer.SendTask(dproto.PacketType_ALL, dbo.Mgmt, proto, profile, ap.Login, ap.Password, ap.Enable, ap.RoCommunity,
 		func(s string) {
 			BoxErrorCallback(s, obj)
-			scheduleBox(obj)
+			scheduleBox(obj, false)
 		},
 		func(response dproto.Response) {
 			BoxAnswerCallback(response, obj)
-			scheduleBox(obj)
+			scheduleBox(obj, false)
 		},
 		func() {
 			BoxTimeoutCallback(obj)
-			scheduleBox(obj)
+			scheduleBox(obj, false)
 		})
 }
 
@@ -105,7 +105,7 @@ func BoxTimeoutCallback (mo *handler.ManagedObject) {
 
 // todo: re-select this object to sync just in case ( alive , etc. )
 // todo: later all of this updates will not be needed, because all will be changed via this ohandler
-func scheduleBox(mo *handler.ManagedObject) {
+func scheduleBox(mo *handler.ManagedObject, urgent bool) {
 	mo.MX.Lock()
 	dboOld := mo.DbObject
 	mo.MX.Unlock()
@@ -126,8 +126,10 @@ func scheduleBox(mo *handler.ManagedObject) {
 
 	dp := dpInt.(models.DiscoveryProfile)
 	boxInterval := time.Duration(dp.BoxInterval) * time.Second
-	//boxInterval = 60 * time.Minute
 	boxInterval = 15 * time.Second
+	if urgent {
+		boxInterval = 5 * time.Second
+	}
 	// todo: ondemand scheduling
 
 	// re-schedule only if time is in the past or is null or time - now > boxInterval

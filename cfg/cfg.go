@@ -11,13 +11,19 @@ type Cfg struct {
 	NatsReplies		string
 
 	LogDir			string
-	LogDebug		bool
 
-	DBHost				string
-	DBPort				int
-	DBName				string
-	DBUser				string
-	DBPassword			string
+	DBHost			string
+	DBPort			int
+	DBName			string
+	DBUser			string
+	DBPassword		string
+
+	RestIP			string
+	RestPort		int
+	SslCert    		string
+	SslKey     		string
+	Ssl				bool
+	LogDebug		bool
 }
 
 // NewCfg reads config with given path
@@ -41,6 +47,12 @@ func NewCfg(path string) (*Cfg, error) {
 
 	c.LogDir = viper.GetString("log.dir")
 	c.LogDebug = viper.GetBool("log.debug")
+
+	c.RestIP = viper.GetString("rest.ip")
+	c.RestPort = viper.GetInt("rest.port")
+	c.Ssl = viper.GetBool("rest.ssl")
+	c.SslCert = viper.GetString("rest.cert")
+	c.SslKey = viper.GetString("rest.key")
 
 	return c, nil
 }

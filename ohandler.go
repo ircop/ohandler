@@ -7,6 +7,7 @@ import (
 	"github.com/ircop/ohandler/logger"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/handler"
+	"github.com/ircop/ohandler/rest"
 	"github.com/ircop/ohandler/streamer"
 	"github.com/ircop/ohandler/tasks"
 	"math/rand"
@@ -74,5 +75,8 @@ func main() {
 
 	 tasks.ScheduleObjects()
 
-	 select{}
+	 web := rest.New(config)
+	 logger.Log("Listening RPC...")
+	 web.Listen()
+	 //select{}
 }

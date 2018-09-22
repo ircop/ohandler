@@ -12,4 +12,11 @@ host = "127.0.0.1"
 port = 6432
 name = "nms"
 user = "nms"
-password = "password"
+password = "password
+
+[rest]
+ip = "0.0.0.0"
+port = 1088
+ssl = true
+cert = "/etc/ssl/xxx.crt"
+key = "/etc/ssl/xxx.key"

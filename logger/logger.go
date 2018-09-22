@@ -15,6 +15,7 @@ type logger struct {
 	logPanic	*os.File
 	logError	*os.File
 	logUpdates	*os.File
+	logWeb		*os.File
 	debug		bool
 }
 
@@ -58,6 +59,13 @@ func (l *logger) openFiles() error {
 		os.O_APPEND | os.O_WRONLY | os.O_CREATE, 0600)
 	if err != nil {
 		return errors.Wrap(err, "Cannot open log file")
+	}
+
+	// rest log
+	l.logWeb, err = os.OpenFile(fmt.Sprintf("%s/rest.log", l.dir),
+		os.O_APPEND | os.O_WRONLY | os.O_CREATE, 0600)
+	if err != nil {
+		return errors.Wrap(err, "Cannot open rest log")
 	}
 
 	// open updates log
@@ -129,6 +137,17 @@ func Panic(message string, args ...interface{}) {
 	message = fmt.Sprintf("%s%s", message, debug.Stack())
 	mlog.write(mlog.format("PANIC", message, args...), mlog.logFile)  // nolint:errcheck
 	mlog.write(mlog.format("PANIC", message, args...), mlog.logPanic) // nolint:errcheck
+}
+
+func Rest(message string, args ...interface{}) {
+	mlog.write(mlog.format("REST", message, args...), mlog.logWeb) // nolint:errcheck
+	//mlog.write(mlog.format("ERROR", message, args...), mlog.logError) // nolint:errcheck
+}
+
+func RestErr(message string, args ...interface{}) {
+	mlog.write(mlog.format("REST ERROR", message, args...), mlog.logWeb) // nolint:errcheck
+	mlog.write(mlog.format("REST ERROR", message, args...), mlog.logError) // nolint:errcheck
+	//mlog.write(mlog.format("ERROR", message, args...), mlog.logError) // nolint:errcheck
 }
 
 // Debug writes log with DEBUG tag, only if debug variable is set to true

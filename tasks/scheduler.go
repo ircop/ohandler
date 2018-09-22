@@ -27,7 +27,7 @@ func ScheduleObjects() {
 
 	handler.Objects.Range(func(key, val interface{}) bool {
 		o := val.(*handler.ManagedObject)
-		scheduleBox(o)
+		scheduleBox(o, false)
 		return true
 	})
 }

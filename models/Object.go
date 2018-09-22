@@ -9,7 +9,7 @@ import (
 )
 
 type Object struct {
-	TableName struct{} `sql:"objects"`
+	TableName struct{} `sql:"objects" json:"-"`
 
 	ID			int64		`json:"id"`
 	Mgmt		string		`json:"mgmt"`
@@ -29,6 +29,15 @@ type Object struct {
 	UplinkID	int64		`json:"uplink_id", sql:"uplink_id"`
 
 	NextBox		time.Time	`json:"next_box"`
+}
+
+func (o *Object) GetInterfacesCount(intType string) (int, error) {
+	q := db.DB.Model(&Interface{}).Where(`object_id = ?`, o.ID)
+	if intType != "" {
+		q.Where(`type = ?`, intType)
+	}
+
+	return q.Count()
 }
 
 func ObjectsAll() ([]Object, error) {
