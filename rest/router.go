@@ -42,6 +42,12 @@ func obs(handler controllers.Controller) func(w http.ResponseWriter, req *http.R
 			handler.GET(httpContext)
 		case "POST":
 			handler.POST(httpContext)
+		case "PUT":
+			handler.PUT(httpContext)
+		case "DELETE":
+			handler.DELETE(httpContext)
+		case "OPTIONS":
+			handler.OPTIONS(httpContext)
 		default:
 			logger.RestErr("[web]: unsupported method (%s) call from %s: ", req.Method, req.RemoteAddr, req.URL)
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

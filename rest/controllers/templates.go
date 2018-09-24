@@ -23,7 +23,7 @@ func returnOk(w io.Writer) {
 }
 
 func notFound(w http.ResponseWriter) {
-	http.Error(w, "not found", http.StatusNotFound)
+	http.Error(w, `{"error":true,"message":"not found"}`, http.StatusNotFound)
 }
 
 func writeJSON(w http.ResponseWriter, value interface{}) {

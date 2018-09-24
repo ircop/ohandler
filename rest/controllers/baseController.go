@@ -40,6 +40,9 @@ func NewContext(ctx context.Context, r http.Request, w http.ResponseWriter) *HTT
 type Controller interface {
 	GET(ctx *HTTPContext)
 	POST(ctx *HTTPContext)
+	PUT(ctx *HTTPContext)
+	DELETE(ctx *HTTPContext)
+	OPTIONS(ctx *HTTPContext)
 	Init(ctx *HTTPContext) error
 }
 
@@ -91,6 +94,10 @@ func (c *HTTPController) Init(ctx *HTTPContext) error {
 
 func (c *HTTPController) checkAuth(ctx *HTTPContext) bool {
 	uri := ctx.r.RequestURI
+
+	if ctx.r.Method == "OPTIONS" {
+		return true
+	}
 
 	// if this is one of unauth-urls, auth is not needed
 	for _, url := range ctx.UnauthRoutes {
@@ -152,10 +159,26 @@ func (c *HTTPController) IntParam(ctx *HTTPContext, name string) (int64, error) 
 	return i, nil
 }
 
+// OPTIONS handler
+func (c *HTTPController) OPTIONS(ctx *HTTPContext) {
+	returnOk(ctx.w)
+}
+
+// DELETE handler
+func (c *HTTPController) DELETE(ctx *HTTPContext) {
+	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
 // POST handler
 func (c *HTTPController) POST(ctx *HTTPContext) {
 	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
 }
+
+// POST handler
+func (c *HTTPController) PUT(ctx *HTTPContext) {
+	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
 // GET handler
 func (c *HTTPController) GET(ctx *HTTPContext) {
 	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)

@@ -22,19 +22,6 @@ func StoreObjects() error {
 		return err
 	}
 
-	//aps := make(map[int64]models.AuthProfile)
-	//dps := make(map[int64]models.DiscoveryProfile)
-	//AuthProfiles.Range(func(key, val interface{}) bool {
-	//	ap := val.(models.AuthProfile)
-	//	aps[ap.ID] = ap
-	//	return true
-	//})
-	//DiscoveryProfiles.Range(func(key, val interface{}) bool {
-	//	dp := val.(models.DiscoveryProfile)
-	//	dps[dp.ID] = dp
-	//	return true
-	//})
-
 	for i, _ := range objects {
 		mo := ManagedObject{DbObject:objects[i]}
 		Objects.Store(objects[i].ID, &mo)
