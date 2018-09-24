@@ -6,6 +6,8 @@ import (
 	"github.com/go-pg/pg"
 	"fmt"
 	"strings"
+	"github.com/ircop/ohandler/handler"
+	"sort"
 )
 
 type AuthProfileController struct {
@@ -22,16 +24,29 @@ func (c *AuthProfileController) GET(ctx *HTTPContext) {
 	// get all profiles
 	result := make(map[string]interface{})
 	var aps []models.AuthProfile
-	if err = db.DB.Model(&aps).Order(`title`).Select(); err != nil {
-		returnError(ctx.w, err.Error(), true)
-		return
-	}
+	handler.AuthProfiles.Range(func(id, profInt interface{}) bool {
+		ap := profInt.(models.AuthProfile)
+		aps = append(aps, ap)
+		return true
+	})
+
+	sort.Slice(aps, func(i, j int) bool { return aps[i].Title < aps[j].Title })
+
 	result["profiles"] = aps
 	writeJSON(ctx.w, result)
 }
 
 func (c *AuthProfileController) GetProfile(id int64, ctx *HTTPContext) {
-	var ap models.AuthProfile
+
+	ap, ok := handler.AuthProfiles.Load(id)
+	if !ok {
+		notFound(ctx.w)
+		return
+	}
+
+	writeJSON(ctx.w, ap)
+
+	/*var ap models.AuthProfile
 	if err := db.DB.Model(&ap).Where(`id = ?`, id).Select(); err != nil {
 		if err == pg.ErrNoRows {
 			notFound(ctx.w)
@@ -41,7 +56,7 @@ func (c *AuthProfileController) GetProfile(id int64, ctx *HTTPContext) {
 		return
 	}
 
-	writeJSON(ctx.w, ap)
+	writeJSON(ctx.w, ap)*/
 }
 
 func (c *AuthProfileController) POST(ctx *HTTPContext) {
@@ -54,7 +69,7 @@ func (c *AuthProfileController) POST(ctx *HTTPContext) {
 		return
 	case "delete":
 		c.Delete(ctx)
-		return 
+		return
 	default:
 		returnError(ctx.w, "Unknown action", true)
 		return
@@ -82,6 +97,7 @@ func (c *AuthProfileController) Delete(ctx *HTTPContext) {
 		returnError(ctx.w, err.Error(), true)
 		return
 	}
+	handler.AuthProfiles.Delete(id)
 
 	returnOk(ctx.w)
 }
@@ -129,6 +145,8 @@ func (c *AuthProfileController) Add(ctx *HTTPContext) {
 		returnError(ctx.w, err.Error(), true)
 		return
 	}
+
+	handler.AuthProfiles.Store(ap.ID, ap)
 
 	returnOk(ctx.w)
 }
@@ -178,15 +196,17 @@ func (c *AuthProfileController) Save(ctx *HTTPContext) {
 		ap.CliType = models.CliTypeNone
 		break
 	}
-	ap.Title = ctx.Params["title"]
-	ap.Login = ctx.Params["login"]
-	ap.Password = ctx.Params["password"]
-	ap.Enable = ctx.Params["enable"]
-	ap.RoCommunity = ctx.Params["ro_community"]
-	ap.RwCommunity = ctx.Params["rw_community"]
+	ap.Title = strings.Trim(ctx.Params["title"], " ")
+	ap.Login = strings.Trim(ctx.Params["login"], " ")
+	ap.Password = strings.Trim(ctx.Params["password"], " ")
+	ap.Enable = strings.Trim(ctx.Params["enable"], " ")
+	ap.RoCommunity = strings.Trim(ctx.Params["ro_community"], " ")
+	ap.RwCommunity = strings.Trim(ctx.Params["rw_community"], " ")
 	if err = db.DB.Update(&ap); err != nil {
 		returnError(ctx.w, err.Error(), true)
+		return
 	} else {
+		handler.AuthProfiles.Store(ap.ID, ap)
 		returnOk(ctx.w)
 	}
 }

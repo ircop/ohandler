@@ -1,12 +1,11 @@
 package controllers
 
 import (
-	"github.com/ircop/ohandler/models"
-	"github.com/ircop/ohandler/db"
-	"github.com/go-pg/pg"
 	"fmt"
+	"github.com/go-pg/pg"
 	"github.com/ircop/discoverer/dproto"
-	"github.com/ircop/ohandler/logger"
+	"github.com/ircop/ohandler/db"
+	"github.com/ircop/ohandler/models"
 )
 
 type ObjectController struct {
@@ -42,7 +41,7 @@ func (c *ObjectController) GetInterfaces(ctx *HTTPContext, obj models.Object) {
 		item["name"] = iface.Name
 		item["shortname"] = iface.Shortname
 		item["description"] = iface.Description
-		logger.Debug("if: %s", iface.Name)
+		//logger.Debug("if: %s", iface.Name)
 		switch iface.Type {
 		case dproto.InterfaceType_PHISYCAL.String(), dproto.InterfaceType_AGGREGATED.String(), dproto.InterfaceType_MANAGEMENT.String():
 			phis = append(phis, item)

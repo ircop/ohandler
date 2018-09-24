@@ -20,7 +20,7 @@ type Object struct {
 	CreatedAT	time.Time	`json:"created_at"`
 	DeletedAT	time.Time	`json:"deleted_at"`
 	Alive		bool		`json:"alive"`
-	ProfileID	int32		`json:"profile_id"`
+	ProfileID	int32		`json:"profile_id" sql:",notnull"`
 
 	Model		string		`json:"model"`
 	Revision	string		`json:"revision"`

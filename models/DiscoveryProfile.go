@@ -11,7 +11,7 @@ type DiscoveryProfile struct {
 
 	ID					int64		`json:"id"`
 	Title				string		`json:"title"`
-	Monitored			bool		`json:"monitored"`
+	Monitored			bool		`json:"monitored" sql:",notnull"`
 	BoxInterval			int64		`json:"box_interval"`
 	PeriodicInterval	int64		`json:"periodic_interval"`
 	PingInterval		int64		`json:"ping_interval"`
