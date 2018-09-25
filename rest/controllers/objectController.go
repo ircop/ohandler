@@ -42,7 +42,8 @@ func (c *ObjectController) GetVlans(ctx *HTTPContext, obj models.Object) {
 	if err := db.DB.Model(&ints).Where(`object_id = ?`, obj.ID).
 		WhereGroup(func(q *orm.Query) (*orm.Query, error) {
 			q.Where(`type = ?`, dproto.InterfaceType_AGGREGATED.String()).
-				WhereOr(`type = ?`, dproto.InterfaceType_PHISYCAL.String())
+				WhereOr(`type = ?`, dproto.InterfaceType_PHISYCAL.String()).
+				WhereOr(`type = ?`, dproto.InterfaceType_SVI.String())
 			return q, nil
 		}).
 		Select(); err != nil {
@@ -78,7 +79,7 @@ func (c *ObjectController) GetVlans(ctx *HTTPContext, obj models.Object) {
 
 		ifname, ok := intmap[ovlans[i].InterfaceID]
 		if !ok {
-			returnError(ctx.w, fmt.Sprintf("Cannot find interface by id (%d)", intmap[ovlans[i].InterfaceID]), true)
+			returnError(ctx.w, fmt.Sprintf("Cannot find interface by id (%d)", ovlans[i].InterfaceID), true)
 			return
 		}
 

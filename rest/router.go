@@ -19,6 +19,7 @@ func getRouter() *mux.Router {
 	router.HandleFunc("/discovery-profiles", obs(&controllers.DiscoveryProfileController{}))
 	router.HandleFunc("/account", obs(&controllers.AccountController{}))
 	router.HandleFunc("/users", obs(&controllers.UsersController{}))
+	router.HandleFunc("/vlans", obs(&controllers.VlansController{}))
 
 	router.Use(middleware)
 	return router
