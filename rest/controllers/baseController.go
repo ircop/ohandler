@@ -41,6 +41,7 @@ type Controller interface {
 	GET(ctx *HTTPContext)
 	POST(ctx *HTTPContext)
 	PUT(ctx *HTTPContext)
+	PATCH(ctx *HTTPContext)
 	DELETE(ctx *HTTPContext)
 	OPTIONS(ctx *HTTPContext)
 	Init(ctx *HTTPContext) error
@@ -137,7 +138,7 @@ func (c *HTTPController) CheckParams(ctx *HTTPContext, names []string) []string 
 	ret := make([]string, 0)
 	for i := range names {
 		p, ok := ctx.Params[names[i]]
-		if !ok || p == "" {
+		if !ok || strings.Trim(p, " ") == "" {
 			ret = append(ret, names[i])
 		}
 	}
@@ -176,6 +177,11 @@ func (c *HTTPController) POST(ctx *HTTPContext) {
 
 // POST handler
 func (c *HTTPController) PUT(ctx *HTTPContext) {
+	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// PATCH handler
+func (c *HTTPController) PATCH(ctx *HTTPContext) {
 	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 

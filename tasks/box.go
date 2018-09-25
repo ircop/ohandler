@@ -135,7 +135,7 @@ func ScheduleBox(mo *handler.ManagedObject, urgent bool) {
 
 	dp := dpInt.(models.DiscoveryProfile)
 	boxInterval := time.Duration(dp.BoxInterval) * time.Second
-	boxInterval = 15 * time.Second
+	//boxInterval = 15 * time.Second
 	if urgent {
 		boxInterval = 5 * time.Second
 	}

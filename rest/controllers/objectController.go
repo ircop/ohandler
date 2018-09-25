@@ -1,8 +1,10 @@
 package controllers
 
 import (
+	"bitbucket.org/zombiezen/cardcpx/natsort"
 	"fmt"
 	"github.com/go-pg/pg"
+	"github.com/go-pg/pg/orm"
 	"github.com/ircop/discoverer/dproto"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/handler"
@@ -10,6 +12,7 @@ import (
 	"github.com/ircop/ohandler/models"
 	"github.com/ircop/ohandler/tasks"
 	"net"
+	"sort"
 	"strings"
 )
 
@@ -23,6 +26,93 @@ type objParams struct {
 	OsID	int64
 	AuthID	int64
 	DiscID	int64
+}
+
+type vlanInts struct {
+	Vid		int64		`json:"vid"`
+	Trunk	[]string	`json:"trunk"`
+	Access	[]string	`json:"access"`
+}
+
+func (c *ObjectController) GetVlans(ctx *HTTPContext, obj models.Object) {
+	result := make(map[string]interface{})
+
+	// fetch all interfaces and put them into map[id]ifname
+	var ints []models.Interface
+	if err := db.DB.Model(&ints).Where(`object_id = ?`, obj.ID).
+		WhereGroup(func(q *orm.Query) (*orm.Query, error) {
+			q.Where(`type = ?`, dproto.InterfaceType_AGGREGATED.String()).
+				WhereOr(`type = ?`, dproto.InterfaceType_PHISYCAL.String())
+			return q, nil
+		}).
+		Select(); err != nil {
+			returnError(ctx.w, err.Error(), true)
+			return
+		}
+	intmap := make(map[int64]string)
+	for i := range ints {
+		intmap[ints[i].ID] = ints[i].Shortname
+	}
+
+	// select object vlans
+	var ovlans []models.ObjectVlan
+	if err := db.DB.Model(&ovlans).Where(`object_id = ?`, obj.ID).Order(`vid`).Select(); err != nil {
+		returnError(ctx.w, err.Error(), true)
+		return
+	}
+
+	// vlans: []vlanItem
+	// item: map[string]interface
+
+	vlanmap := make(map[int64]vlanInts)
+
+	for i := range ovlans {
+		vlan, ok := vlanmap[ovlans[i].VID]
+		if !ok {
+			vlan = vlanInts{
+				Vid:ovlans[i].VID,
+				Trunk:make([]string,0),
+				Access:make([]string,0),
+			}
+		}
+
+		ifname, ok := intmap[ovlans[i].InterfaceID]
+		if !ok {
+			returnError(ctx.w, fmt.Sprintf("Cannot find interface by id (%d)", intmap[ovlans[i].InterfaceID]), true)
+			return
+		}
+
+		if ovlans[i].Mode == models.VlanType_ACCESS.String() {
+			vlan.Access = append(vlan.Access, ifname)
+		} else if ovlans[i].Mode == models.VlanType_TRUNK.String() {
+			vlan.Trunk = append(vlan.Trunk, ifname)
+		}
+
+		vlanmap[ovlans[i].VID] = vlan
+	}
+
+	// sort vlans by vlan id
+	//vlans := make([]vlanInts, 0)
+	vlans := make([]interface{}, 0)
+	for i, _ := range vlanmap {
+		v := vlanmap[i]
+		// sort ifnames
+		sort.Slice(v.Trunk, func(i, j int) bool { return natsort.Less(v.Trunk[i], v.Trunk[j]) })
+		sort.Slice(v.Access, func(i, j int) bool { return natsort.Less(v.Access[i], v.Access[j]) })
+		item := make(map[string]interface{})
+		item["vid"] = v.Vid
+		item["trunk"] = strings.Join(v.Trunk, ", ")
+		item["access"] = strings.Join(v.Access, ", ")
+		//vlans = append(vlans, v)
+		vlans = append(vlans, item)
+	}
+
+	//sort.Slice(aps, func(i, j int) bool { return aps[i].Title < aps[j].Title })
+	sort.Slice(vlans, func(i, j int) bool { return vlans[i].(map[string]interface{})["vid"].(int64) < vlans[j].(map[string]interface{})["vid"].(int64) })
+
+	result["vlans"] = vlans
+
+	writeJSON(ctx.w, result)
 }
 
 func (c *ObjectController) GetInterfaces(ctx *HTTPContext, obj models.Object) {
@@ -98,10 +188,21 @@ func (c *ObjectController) GET(ctx *HTTPContext) {
 	case "interfaces":
 		c.GetInterfaces(ctx, obj)
 		return
+	case "vlans":
+		c.GetVlans(ctx, obj)
+		return
 	}
 
+	// Count interfaces
 	intCount, err := obj.GetInterfacesCount("")
 	if err != nil {
+		returnError(ctx.w, err.Error(), true)
+		return
+	}
+
+	// Count vlans
+	var vlanCnt int64
+	if _, err := db.DB.Query(&vlanCnt, `select count(distinct(vid)) from object_vlans where object_id=?`, obj.ID); err != nil {
 		returnError(ctx.w, err.Error(), true)
 		return
 	}
@@ -109,6 +210,7 @@ func (c *ObjectController) GET(ctx *HTTPContext) {
 	result := make(map[string]interface{})
 	result["object"] = obj
 	result["interfaces"] = intCount
+	result["vlans"] = vlanCnt
 	writeJSON(ctx.w, result)
 }
 

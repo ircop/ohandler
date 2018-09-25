@@ -15,6 +15,7 @@ type logger struct {
 	logPanic	*os.File
 	logError	*os.File
 	logUpdates	*os.File
+	logDebug	*os.File
 	logWeb		*os.File
 	debug		bool
 }
@@ -52,6 +53,13 @@ func (l *logger) openFiles() error {
 		if !fi.Mode().IsDir() {
 			return fmt.Errorf("Log path is not a directory")
 		}
+	}
+
+	// debug log
+	l.logDebug, err = os.OpenFile(fmt.Sprintf("%s/debug.log", l.dir),
+		os.O_APPEND | os.O_WRONLY | os.O_CREATE, 0600)
+	if err != nil {
+		return errors.Wrap(err, "Cannot open debug log file")
 	}
 
 	// open regular and panic files
@@ -108,6 +116,7 @@ func (l *logger) write(message string, w io.Writer) error {
 
 	if l.debug {
 		fmt.Printf(message)
+		l.logDebug.Write([]byte(message))
 	}
 
 	if err != nil {

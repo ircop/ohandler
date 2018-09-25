@@ -1,12 +1,12 @@
 package controllers
 
 import (
-	"github.com/ircop/ohandler/models"
-	"github.com/ircop/ohandler/db"
-	"github.com/ircop/ohandler/logger"
-	"strconv"
 	"github.com/go-pg/pg"
 	"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/ohandler/db"
+	"github.com/ircop/ohandler/logger"
+	"github.com/ircop/ohandler/models"
+	"strconv"
 )
 
 type ObjectsController struct {
@@ -28,6 +28,12 @@ type webObj struct {
 
 type intCount struct {
 	TableName struct{} 		`sql:"interfaces" json:"-"`
+	ObjectID		int64	`sql:"object_id"`
+	Count			int64	`sql:"cnt"`
+}
+
+type objvlans struct {
+	TableName struct{} 		`sql:"object_vlans" json:"-"`
 	ObjectID		int64	`sql:"object_id"`
 	Count			int64	`sql:"cnt"`
 }
@@ -120,6 +126,24 @@ func (c *ObjectsController) GET(ctx *HTTPContext) {
 
 		ids = append(ids, objects[i].ID)
 		rows = append(rows, item)
+	}
+
+	// Count vlans
+	var vcounts []objvlans
+	if err := db.DB.Model(&vcounts).Column(`object_id`).ColumnExpr(`count(distinct(vid)) as cnt`).
+		Where(`object_id in (?)`, pg.In(ids)).
+		Group(`object_id`).
+		Select(); err != nil {
+			returnError(ctx.w, err.Error(), true)
+			return
+		}
+
+	for i := range vcounts {
+		for j := range rows {
+			if rows[j]["id"].(int64) == vcounts[i].ObjectID {
+				rows[j]["vlans"] = vcounts[i].Count
+			}
+		}
 	}
 
 	if err = c.GetInterfaceCounts(rows, ids); err != nil {

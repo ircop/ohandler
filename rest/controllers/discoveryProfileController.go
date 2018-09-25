@@ -5,6 +5,7 @@ import (
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/handler"
 	"github.com/ircop/ohandler/models"
+	"github.com/ircop/ohandler/tasks"
 	"sort"
 	"strings"
 )
@@ -140,6 +141,7 @@ func (c *DiscoveryProfileController) Save(ctx *HTTPContext) {
 	}
 	dp := dpInt.(models.DiscoveryProfile)
 
+	oldBox := dp.BoxInterval
 	dp.Title = strings.Trim(ctx.Params["title"], " ")
 	dp.BoxInterval = boxInt
 	dp.PeriodicInterval = perInt
@@ -151,8 +153,27 @@ func (c *DiscoveryProfileController) Save(ctx *HTTPContext) {
 		return
 	} else {
 		handler.DiscoveryProfiles.Store(dp.ID, dp)
-		returnOk(ctx.w)
 	}
+
+	// todo: if profile is changed, AND if discovery interval has been changed (if new interval is smaller then old one),
+	// we need re-shedule stored objects.
+	if oldBox > boxInt {
+		var objects []models.Object
+		if err := db.DB.Model(&objects).Where(`discovery_id = ?`, id).Select(); err != nil {
+			returnError(ctx.w, err.Error(), true)
+		}
+
+		for i := range objects {
+			moInt, ok := handler.Objects.Load(objects[i].ID)
+			if !ok {
+				returnError(ctx.w, fmt.Sprintf("Cannot find object %d in memory!", objects[i].ID), true)
+				return
+			}
+			mo := moInt.(*handler.ManagedObject)
+			tasks.ScheduleBox(mo, false)
+		}
+	}
+	returnOk(ctx.w)
 }
 
 func (c *DiscoveryProfileController) Add(ctx *HTTPContext) {

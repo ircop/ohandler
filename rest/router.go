@@ -17,6 +17,8 @@ func getRouter() *mux.Router {
 	router.HandleFunc("/os-profiles", obs(&controllers.OsProfilesController{}))
 	router.HandleFunc("/auth-profiles", obs(&controllers.AuthProfileController{}))
 	router.HandleFunc("/discovery-profiles", obs(&controllers.DiscoveryProfileController{}))
+	router.HandleFunc("/account", obs(&controllers.AccountController{}))
+	router.HandleFunc("/users", obs(&controllers.UsersController{}))
 
 	router.Use(middleware)
 	return router
@@ -44,6 +46,8 @@ func obs(handler controllers.Controller) func(w http.ResponseWriter, req *http.R
 			handler.POST(httpContext)
 		case "PUT":
 			handler.PUT(httpContext)
+		case "PATCH":
+			handler.PATCH(httpContext)
 		case "DELETE":
 			handler.DELETE(httpContext)
 		case "OPTIONS":

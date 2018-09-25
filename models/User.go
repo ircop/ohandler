@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/go-pg/pg"
 	"github.com/ircop/ohandler/db"
+	"ircop/lightnms/models"
 )
 
 type User struct {
@@ -26,4 +27,18 @@ func UserByLogin(login string) (*User, error) {
 	}
 
 	return &user, nil
+}
+
+func UserByToken(token string) (*User, error) {
+	var t models.Token
+	if err := db.DB.Model(&t).Where(`key = ?`, token).First(); err != nil {
+		return nil, err
+	}
+
+	var u User
+	if err := db.DB.Model(&u).Where(`id = ?`, t.UserID).First(); err != nil {
+		return nil, err
+	}
+
+	return &u, nil
 }
