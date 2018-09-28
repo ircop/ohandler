@@ -34,7 +34,7 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	logger.Debug("Running box discovery for %s (%s)", dbo.Name, dbo.Mgmt)
 	if !dbo.Alive {
 		logger.Log("Skipping box discovery for %s: !alive", dbo.Name)
-		ScheduleBox(obj, false)
+		SheduleBox(obj, false)
 		return
 	}
 
@@ -42,7 +42,7 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	apInt, ok := handler.AuthProfiles.Load(dbo.AuthID)
 	if !ok {
 		logger.Err("No auth profile for object %d found!", dbo.ID)
-		ScheduleBox(obj, false)
+		SheduleBox(obj, false)
 		return
 	}
 	ap := apInt.(models.AuthProfile)
@@ -56,7 +56,7 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	profile, err := dbo.GetProfile()
 	if err != nil {
 		logger.Err("%s: %s", dbo.Name, err.Error())
-		ScheduleBox(obj, false)
+		SheduleBox(obj, false)
 		return
 	}
 
@@ -64,15 +64,15 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	streamer.SendTask(dproto.PacketType_ALL, dbo.Mgmt, proto, profile, ap.Login, ap.Password, ap.Enable, ap.RoCommunity,
 		func(s string) {
 			BoxErrorCallback(s, obj)
-			ScheduleBox(obj, false)
+			SheduleBox(obj, false)
 		},
 		func(response dproto.Response) {
 			BoxAnswerCallback(response, obj)
-			ScheduleBox(obj, false)
+			SheduleBox(obj, false)
 		},
 		func() {
 			BoxTimeoutCallback(obj)
-			ScheduleBox(obj, false)
+			SheduleBox(obj, false)
 		})
 }
 
@@ -114,7 +114,7 @@ func BoxTimeoutCallback (mo *handler.ManagedObject) {
 
 // todo: re-select this object to sync just in case ( alive , etc. )
 // todo: later all of this updates will not be needed, because all will be changed via this ohandler
-func ScheduleBox(mo *handler.ManagedObject, urgent bool) {
+func SheduleBox(mo *handler.ManagedObject, urgent bool) {
 	mo.MX.Lock()
 	dboOld := mo.DbObject
 	mo.MX.Unlock()
@@ -167,5 +167,5 @@ func ScheduleBox(mo *handler.ManagedObject, urgent bool) {
 		BoxDiscovery(mo)
 	})
 
-	logger.Debug("Scheduled box discovery for %s (%s) at %+#v", dbo.Name, dbo.Mgmt, dbo.NextBox.In(Location).String())
+	logger.Debug("Sheduled box discovery for %s (%s) at %+#v", dbo.Name, dbo.Mgmt, dbo.NextBox.In(Location).String())
 }

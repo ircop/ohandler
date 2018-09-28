@@ -12,9 +12,21 @@ import (
 	"github.com/ircop/ohandler/models"
 	"github.com/ircop/ohandler/tasks"
 	"net"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
+
+type linkInfo struct {
+	Iface			models.Interface
+	Ifname			string
+	LinkID			int64
+	RemoteObjID		int64
+	RemotePortID	int64
+	RemoteName		string
+	RemotePortName	string
+}
 
 type ObjectController struct {
 	HTTPController
@@ -32,6 +44,99 @@ type vlanInts struct {
 	Vid		int64		`json:"vid"`
 	Trunk	[]string	`json:"trunk"`
 	Access	[]string	`json:"access"`
+}
+
+func (c *ObjectController) GetLinks(ctx *HTTPContext, obj models.Object) {
+	result := make(map[string]interface{})
+
+	// 1: select interfaces (we should show interfaces + theyr links)
+	var ints []models.Interface
+	_, err := db.DB.Query(&ints, `select * from interfaces where object_id = ? AND (type = ? OR type = ?) order by natsort(name)`, obj.ID, dproto.InterfaceType_PHISYCAL.String(), dproto.InterfaceType_AGGREGATED.String())
+	if err != nil {
+		returnError(ctx.w, err.Error(),true)
+		return
+	}
+
+	var links []models.Link
+	if err := db.DB.Model(&links).Where(`object1_id = ?`, obj.ID).WhereOr(`object2_id = ?`, obj.ID).Select(); err != nil {
+		returnError(ctx.w, err.Error(),true)
+		return
+	}
+
+	objIDs := make([]int64,0)
+	intIDs := make([]int64,0)
+	objIdName := make(map[int64]string)
+	intIdName := make(map[int64]string)
+	for i := range links {
+		if links[i].Object1ID == obj.ID {
+			objIDs = append(objIDs, links[i].Object2ID)
+			intIDs = append(intIDs, links[i].Int2ID)
+		} else if links[i].Object2ID == obj.ID {
+			objIDs = append(objIDs, links[i].Object1ID)
+			intIDs = append(intIDs, links[i].Int1ID)
+		}
+	}
+
+	// select objects and interfaces
+	var objects []models.Object
+	var interfaces []models.Interface
+	if len(links) > 0 {
+		if err = db.DB.Model(&objects).Where(`id in (?)`, pg.In(objIDs)).Select(); err != nil {
+			returnError(ctx.w, err.Error(), true)
+			return
+		}
+		if err = db.DB.Model(&interfaces).Where(`id in (?)`, pg.In(intIDs)).Select(); err != nil {
+			returnError(ctx.w, err.Error(), true)
+			return
+		}
+		for i := range objects {
+			objIdName[objects[i].ID] = objects[i].Name
+		}
+		for i := range interfaces {
+			intIdName[interfaces[i].ID] = interfaces[i].Shortname
+		}
+	}
+
+	// interface -> remote port -> remote object
+	// []{ intID(local), intName(local), linkID, nei.ID, nei.int.ID, nei.Name, nei.int.Name
+
+	ifaces := make([]interface{}, 0)
+	for i := range ints {
+		item := make(map[string]interface{})
+		item["local_port"] = ints[i].Shortname
+		item["local_port_id"] = ints[i].ID
+		item["local_port_descr"] = ints[i].Description
+		item["link_id"] = 0
+		item["remote_port"] = ""
+		item["remote_port_id"] = 0
+		item["remote_object"] = ""
+		item["remote_object_id"] = ""
+
+		// loop over links; fill current link if matched
+		for n := range links {
+			if links[n].Int2ID == ints[i].ID {
+				item["link_id"] = links[n].ID
+				item["remote_port"] = intIdName[links[n].Int1ID]
+				item["remote_port_id"] = links[n].Int1ID
+				item["remote_object"] = objIdName[links[n].Object1ID]
+				item["remote_object_id"] = links[n].Object1ID
+				break
+			}
+			if links[n].Int1ID == ints[i].ID {
+				item["link_id"] = links[n].ID
+				item["remote_port"] = intIdName[links[n].Int2ID]
+				item["remote_port_id"] = links[n].Int2ID
+				item["remote_object"] = objIdName[links[n].Object2ID]
+				item["remote_object_id"] = links[n].Object2ID
+				break
+			}
+		}
+		ifaces = append(ifaces, item)
+	}
+
+	result["ifaces"] = ifaces
+
+	writeJSON(ctx.w, result)
 }
 
 func (c *ObjectController) GetVlans(ctx *HTTPContext, obj models.Object) {
@@ -129,9 +234,6 @@ func (c *ObjectController) GetInterfaces(ctx *HTTPContext, obj models.Object) {
 	other := make([]interface{}, 0)
 
 	ints := make([]models.Interface, 0)
-	/*err := db.DB.Model(&ints).Where(`object_id = ?`, obj.ID).
-		Order(`natsort(name)`).
-		Select()*/
 	_, err := db.DB.Query(&ints, `select * from interfaces where object_id = ? order by natsort(name)`, obj.ID)
 	if err != nil {
 		returnError(ctx.w, err.Error(), true)
@@ -186,6 +288,9 @@ func (c *ObjectController) GET(ctx *HTTPContext) {
 	}
 
 	switch ctx.Params["what"] {
+	case "links":
+		c.GetLinks(ctx, obj)
+		return
 	case "interfaces":
 		c.GetInterfaces(ctx, obj)
 		return
@@ -208,10 +313,28 @@ func (c *ObjectController) GET(ctx *HTTPContext) {
 		return
 	}
 
+	var linkCnt int
+	if linkCnt, err = db.DB.Model(&models.Link{}).Where(`object1_id = ?`, obj.ID).WhereOr(`object2_id = ?`, obj.ID).Count(); err != nil {
+		returnError(ctx.w, err.Error(),true)
+		return
+	}
+
+	var segs []models.ObjectSegment
+	if err = db.DB.Model(&segs).Where(`object_id = ?`, obj.ID).Select(); err != nil {
+		returnError(ctx.w, err.Error(), true)
+		return
+	}
+	segments := make([]int64, 0)
+	for i := range segs {
+		segments = append(segments, segs[i].SegmentID)
+	}
+
 	result := make(map[string]interface{})
+	result["segments"] = segments
 	result["object"] = obj
 	result["interfaces"] = intCount
 	result["vlans"] = vlanCnt
+	result["links"] = linkCnt
 	writeJSON(ctx.w, result)
 }
 
@@ -305,7 +428,92 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 	mo.DbObject = o
 	mo.MX.Unlock()
 
-	tasks.ScheduleBox(mo, false)
+	tasks.SheduleBox(mo, false)
+
+	if err = c.updateSegments(ctx, o); err != nil {
+		returnError(ctx.w, err.Error(), true)
+		return
+	}
+
+	returnOk(ctx.w)
+}
+
+func (c *ObjectController) updateSegments(ctx *HTTPContext, dbo models.Object) error {
+	// compare segments
+	var oldSegs []models.ObjectSegment
+	if err := db.DB.Model(&oldSegs).Where(`object_id = ?`, dbo.ID).Select(); err != nil {
+		return err
+	}
+	newSegs := make([]int64, 0)
+	re, err := regexp.Compile(`(\d+)`)
+	if err != nil {
+		return err
+	}
+	// segments is a string like '[123 543 567 765]', because we have parsed all params as string :(
+	matches := re.FindAllStringSubmatch(ctx.Params["segments"], -1)
+	for i := range matches{
+		sInt := matches[i][0]
+		segID, err := strconv.ParseInt(sInt, 10, 64)
+		if err == nil {
+			newSegs = append(newSegs, segID)
+		}
+	}
+
+	// remove old and add new segments
+	for i := range newSegs {
+		found := false
+		for j := range oldSegs {
+			if oldSegs[j].SegmentID == newSegs[i] {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			// add new segment
+			s := models.ObjectSegment{SegmentID:newSegs[i], ObjectID:dbo.ID}
+			if err = db.DB.Insert(&s); err != nil {
+				return err
+			}
+		}
+	}
+
+	for i := range oldSegs {
+		found := false
+		for j := range newSegs {
+			if newSegs[j] == oldSegs[i].SegmentID {
+				found = true
+				break
+			}
+		}
+		// remove old segment
+		if !found {
+			if _, err = db.DB.Model(&models.ObjectSegment{}).Where(`id = ?`, oldSegs[i].ID).Delete(); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// PATCH: re-discover
+func (c *ObjectController) PATCH(ctx *HTTPContext) {
+	// re-discover
+	id, err := c.IntParam(ctx, "id")
+	if err != nil || id == 0 {
+		returnError(ctx.w, "Wrong object ID", true)
+		return
+	}
+
+	moInt, ok := handler.Objects.Load(id)
+	if !ok {
+		notFound(ctx.w)
+		return
+	}
+
+	mo := moInt.(*handler.ManagedObject)
+	tasks.SheduleBox(mo, true)
 
 	returnOk(ctx.w)
 }
@@ -356,7 +564,9 @@ func (c *ObjectController) POST(ctx *HTTPContext) {
 	mo := handler.ManagedObject{DbObject:o}
 	handler.Objects.Store(o.ID, &mo)
 
-	tasks.ScheduleBox(&mo, true)
+	tasks.SheduleBox(&mo, true)
+
+	c.updateSegments(ctx, o)
 
 	returnOk(ctx.w)
 }

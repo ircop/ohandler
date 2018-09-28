@@ -15,7 +15,7 @@ func ScheduleObjects() {
 	var err error
 	Location, err = time.LoadLocation("Local")
 	if nil != err {
-		panic(fmt.Errorf("Cannot schedule anything, no local timezone: %s", err.Error()))
+		panic(fmt.Errorf("Cannot shedule anything, no local timezone: %s", err.Error()))
 	}
 
 	dps := make(map[int64]models.DiscoveryProfile)
@@ -27,7 +27,7 @@ func ScheduleObjects() {
 
 	handler.Objects.Range(func(key, val interface{}) bool {
 		o := val.(*handler.ManagedObject)
-		ScheduleBox(o, false)
+		SheduleBox(o, false)
 		return true
 	})
 }

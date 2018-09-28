@@ -170,6 +170,10 @@ func getDbVlans(dbo models.Object) (map[int64]map[int64]models.ObjectVlan, error
 func getDeviceVlans(discovered []*dproto.Vlan, dbo models.Object) (map[int64]map[int64]string, error) {
 	result := make(map[int64]map[int64]string, 0)
 
+	/*if dbo.Name == "10.170.52.244" {
+		logger.Debug("VLANS FOR 10.170.52.244  :: %+#v", discovered)
+	}*/
+
 	// get interfaces: map[name]Interface and map[shortname]Interface
 	//ifnames, err := getIfnames(dbo)
 	ifnames, err := getIfnamesAll(dbo)
@@ -186,7 +190,9 @@ func getDeviceVlans(discovered []*dproto.Vlan, dbo models.Object) (map[int64]map
 			ifname := vlan.AccessPorts[j]
 			iface, ok := ifnames[ifname]
 			if !ok {
-				return result, fmt.Errorf("%d: Cannot find interface ID for '%s' (access)", vid, ifname)
+				//return result, fmt.Errorf("%d: Cannot find interface ID for '%s' (access)", vid, ifname)
+				logger.Err("%s: Cannot find interface ID for '%s' (access)", dbo.Name, ifname)
+				continue
 			}
 			interfaces[iface.ID] = models.VlanType_ACCESS.String()
 		}
@@ -194,7 +200,9 @@ func getDeviceVlans(discovered []*dproto.Vlan, dbo models.Object) (map[int64]map
 			ifname := vlan.TrunkPorts[j]
 			iface, ok := ifnames[ifname]
 			if !ok {
-				return result, fmt.Errorf("%d: Cannot find interface ID for '%s' (trunk)", vid, ifname)
+				logger.Err("%s: Cannot find interface ID for '%s' (trunk)", dbo.Name, ifname)
+				continue
+				//return result, fmt.Errorf("%d: Cannot find interface ID for '%s' (trunk)", vid, ifname)
 			}
 			interfaces[iface.ID] = models.VlanType_TRUNK.String()
 		}

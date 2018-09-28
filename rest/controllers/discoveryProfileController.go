@@ -170,7 +170,7 @@ func (c *DiscoveryProfileController) Save(ctx *HTTPContext) {
 				return
 			}
 			mo := moInt.(*handler.ManagedObject)
-			tasks.ScheduleBox(mo, false)
+			tasks.SheduleBox(mo, false)
 		}
 	}
 	returnOk(ctx.w)

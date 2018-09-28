@@ -42,8 +42,8 @@ func compareInterfaces(news map[string]*dproto.Interface, mo *handler.ManagedObj
 	// check 2: loop over new interfaces. Add if there is no new interface in olds map.
 	for name, iface := range newIfs {
 		//logger.Debug("-- NEWIFS.NAME: '%s'", name)
-		//
-		if _, ok := oldIfs[name]; !ok {
+		// todo: compare new+old interface params (descr, lldp id)
+		if old, ok := oldIfs[name]; !ok {
 			logger.Update("%s: adding interface %s", dbo.Name, iface.Name)
 
 			newIf := models.Interface{
@@ -59,6 +59,16 @@ func compareInterfaces(news map[string]*dproto.Interface, mo *handler.ManagedObj
 				logger.Err("%s: Failed to insert interface %s: %s", dbo.Name, iface.Name, err.Error())
 				logger.Update("%s: Failed to insert interface %s: %s", dbo.Name, iface.Name, err.Error())
 
+			}
+		} else {
+			if iface.Description != old.Description || iface.LldpID != old.LldpID {
+				logger.Update("%s: updating lldpID/descr for %s", dbo.Name, iface.Name)
+				old.Description = iface.Description
+				old.LldpID = iface.LldpID
+				if err := db.DB.Update(&old); err != nil {
+					logger.Err("%s: Failed to update %s lldpID/descr: %s", dbo.Name, iface.Name, err.Error())
+					logger.Update("%s: Failed to update %s lldpID/descr: %s", dbo.Name, iface.Name, err.Error())
+				}
 			}
 		}
 	}

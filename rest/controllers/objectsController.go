@@ -38,6 +38,12 @@ type objvlans struct {
 	Count			int64	`sql:"cnt"`
 }
 
+type linkCount struct {
+	TableName struct{} 		`sql:"links" json:"-"`
+	ObjectID		int64	`sql:"oid"`
+	Count			int 	`sql:"cnt"`
+}
+
 func (c *ObjectsController) GET(ctx *HTTPContext) {
 	// todo: pagination, sorting
 	order := "id ASC"
@@ -123,6 +129,7 @@ func (c *ObjectsController) GET(ctx *HTTPContext) {
 		item["version"] = objects[i].Version
 		item["serial"] = objects[i].Serial
 		item["interfaces"] = 0
+		item["links"] = 0
 
 		ids = append(ids, objects[i].ID)
 		rows = append(rows, item)
@@ -150,6 +157,36 @@ func (c *ObjectsController) GET(ctx *HTTPContext) {
 		logger.RestErr("Error selecting int count: %s", err.Error())
 		internalError(ctx.w, err.Error())
 		return
+	}
+
+	// Count links: 2 times, because of 'object1 or object2'
+	var lcount1 []linkCount
+	var lcount2 []linkCount
+	if err := db.DB.Model(&lcount1).ColumnExpr(`object1_id as oid`).ColumnExpr(`count(*) as cnt`).
+		Where(`object1_id in (?)`, pg.In(ids)).Group(`object1_id`).Select(); err != nil {
+			returnError(ctx.w, err.Error(), true)
+		return
+	}
+	if err := db.DB.Model(&lcount2).ColumnExpr(`object2_id as oid`).ColumnExpr(`count(*) as cnt`).
+		Where(`object2_id in (?)`, pg.In(ids)).Group(`object2_id`).Select(); err != nil {
+		returnError(ctx.w, err.Error(), true)
+		return
+	}
+	for i := range lcount1 {
+		for j := range rows {
+			if rows[j]["id"].(int64) == lcount1[i].ObjectID {
+				links := rows[j]["links"].(int) + lcount1[i].Count
+				rows[j]["links"] = links
+			}
+		}
+	}
+	for i := range lcount2 {
+		for j := range rows {
+			if rows[j]["id"].(int64) == lcount2[i].ObjectID {
+				links := rows[j]["links"].(int) + lcount2[i].Count
+				rows[j]["links"] = links
+			}
+		}
 	}
 
 	// return result

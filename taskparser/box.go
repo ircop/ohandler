@@ -23,6 +23,11 @@ func ParseBoxResult(response dproto.Response, mo *handler.ManagedObject, dbo mod
 		comparePlatform(response.Platform, mo, dbo)
 	}
 
+	// after parsing platform, DBO may be changed
+	mo.MX.Lock()
+	dbo = mo.DbObject
+	mo.MX.Unlock()
+
 	// Interfaces
 	if e, ok := response.Errors[dproto.PacketType_INTERFACES.String()]; ok {
 		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.PacketType_INTERFACES.String(), e)
@@ -111,6 +116,7 @@ func comparePlatform(platform *dproto.Platform, mo *handler.ManagedObject, dbo m
 			mo.MX.Lock()
 			mo.DbObject = dbo
 			mo.MX.Unlock()
+			handler.Objects.Store(dbo.ID, mo)
 		}
 	}
 

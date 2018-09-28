@@ -4,6 +4,7 @@ import (
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
 	"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/discoverer/util/mac"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/handler"
 	"github.com/ircop/ohandler/logger"
@@ -71,18 +72,23 @@ func compareLldp(neighbors []*dproto.LldpNeighbor, mo *handler.ManagedObject, db
 				continue
 			}
 			if err != nil && err == pg.ErrNoRows {
+				logger.Debug("%s: Cannot find neighbot by chassis id '%s' on port '%s'", dbo.Name, cidMac.String(), localPort.Name)
 				continue
 			}
 			neighborID = cmak.ObjectID
 		}
 
+		portID := instance.PortID
+		if Mac.IsMac(instance.PortID) {
+			portID = Mac.New(instance.PortID).String()
+		}
 		// neighbor found in DB. Next try to find port.
 		var remoteIF models.Interface
 		if err = db.DB.Model(&remoteIF).Where(`object_id = ?`, neighborID).
 			WhereGroup(func(q *orm.Query) (*orm.Query, error) {
-				q.Where(`lldp_id = ?`, instance.PortID).
-					WhereOr(`shortname = ?`, instance.PortID).
-					WhereOr(`name = ?`, instance.PortID)
+				q.Where(`lldp_id = ?`, portID).
+					WhereOr(`shortname = ?`, portID).
+					WhereOr(`name = ?`, portID)
 				return q, nil
 			}).Select(); err != nil && err != pg.ErrNoRows {
 				logger.Err("%s: Failed to select neighbor port '%s' in db: %s", instance.PortID, err.Error())
@@ -136,8 +142,8 @@ func compareLldp(neighbors []*dproto.LldpNeighbor, mo *handler.ManagedObject, db
 			logger.Update("%s: Adding new LLDP neighbor for port id %d (nei %d/port %d)", dbo.Name, nei.LocalInterfaceID, nei.NeighborID, nei.NeighborInterfaceID)
 			err = db.DB.Insert(&nei)
 			if err != nil {
-				logger.Err("%s: Failed to insert new lldp neighbor (localport, nei, neiport = %d/%d/%d): %s", dbo.Name, nei.NeighborID, nei.NeighborInterfaceID, err.Error())
-				logger.Update("%s: Failed to insert new lldp neighbor (localport, nei, neiport = %d/%d/%d): %s", dbo.Name, nei.NeighborID, nei.NeighborInterfaceID, err.Error())
+				logger.Err("%s: Failed to insert new lldp neighbor (localport, nei, neiport = %d/%d/%d): %s", dbo.Name, nei.LocalInterfaceID, nei.NeighborID, nei.NeighborInterfaceID, err.Error())
+				logger.Update("%s: Failed to insert new lldp neighbor (localport, nei, neiport = %d/%d/%d): %s", dbo.Name, nei.LocalInterfaceID, nei.NeighborID, nei.NeighborInterfaceID, err.Error())
 				return
 			}
 		}
@@ -162,10 +168,14 @@ func compareLldp(neighbors []*dproto.LldpNeighbor, mo *handler.ManagedObject, db
 // N: select all db links for this object
 func processLinks(neighbors []models.LldpNeighbor, mo *handler.ManagedObject, dbo models.Object) {
 	for i, _ := range neighbors{
+		//if dbo.Name == "J1" {
+		//	logger.Debug("PROCESSING J1 link: %+#v", neighbors[i])
+		//}
 		nei := neighbors[i]
 		// try to select 'remote' lldp neighbor
 		// if there is no opposite LLDP record, just skip this neighbor.
 		// link will be build if opposite neighbor will
+		//logger.Debug("%s: searching opposite lldp neighbor for cid/pid %s/%s on port %s...", dbo.Name, )
 		var remote models.LldpNeighbor
 		err := db.DB.Model(&remote).Where(`neighbor_id = ?`, dbo.ID).Where(`neighbor_interface_id = ?`, nei.LocalInterfaceID).
 			Where(`object_id = ?`, nei.NeighborID).Where(`local_interface_id = ?`, nei.NeighborInterfaceID).
