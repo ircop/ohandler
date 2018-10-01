@@ -25,6 +25,7 @@ func getRouter() *mux.Router {
 	router.HandleFunc("/search", obs(&controllers.SearchController{}))
 	router.HandleFunc("/links", obs(&controllers.LinksController{}))
 	router.HandleFunc("/segments", obs(&controllers.SegmentsController{}))
+	router.HandleFunc("/configs", obs(&controllers.ConfigsController{}))
 
 	router.Use(middleware)
 	return router

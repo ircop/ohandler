@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/go-pg/pg"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/models"
 )
@@ -10,13 +11,30 @@ type MapController struct {
 }
 
 func (c *MapController) GET(ctx *HTTPContext) {
+	sid, err := c.IntParam(ctx, "segment")
+	if err != nil {
+		returnError(ctx.w, "Wrong segment id", true)
+		return
+	}
+
 	var objs []models.Object
+	oids := make([]int64, 0)
 	var links []models.Link
-	if err := db.DB.Model(&objs).Select(); err != nil {
+	if err := db.DB.Model(&objs).
+			Join(`JOIN object_segments AS s ON s.object_id = object.id`).
+			Where(`s.segment_id = ?`, sid).
+			Select(); err != nil {
 		returnError(ctx.w, err.Error(), true)
 		return
 	}
-	if err := db.DB.Model(&links).Select(); err != nil {
+	for i := range objs {
+		oids = append(oids, objs[i].ID)
+	}
+
+	if err := db.DB.Model(&links).
+			Where(`object1_id in (?)`, pg.In(oids)).
+			WhereOr(`object2_id in (?)`, pg.In(oids)).
+			Select(); err != nil {
 		returnError(ctx.w, err.Error(), true)
 		return
 	}

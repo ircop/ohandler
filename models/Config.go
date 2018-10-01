@@ -3,7 +3,7 @@ package models
 import "time"
 
 type Config struct {
-	TableName struct{} `sql:"configs"`
+	TableName struct{} `sql:"configs" json:"-"`
 
 	ID 			int64		`json:"id"`
 	ObjectID	int64		`json:"object_id"`
