@@ -3,7 +3,7 @@ package taskparser
 import (
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
-	"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/dproto"
 	"github.com/ircop/discoverer/util/mac"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/handler"

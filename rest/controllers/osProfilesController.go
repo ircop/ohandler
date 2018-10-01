@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/dproto"
 	"sort"
 )
 

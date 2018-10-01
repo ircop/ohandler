@@ -1,7 +1,8 @@
 package taskparser
 
 import (
-	"github.com/ircop/discoverer/dproto"
+	//"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/dproto"
 	"github.com/ircop/ohandler/handler"
 	"github.com/ircop/ohandler/models"
 	"github.com/ircop/ohandler/db"

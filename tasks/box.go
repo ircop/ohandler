@@ -1,7 +1,8 @@
 package tasks
 
 import (
-	"github.com/ircop/discoverer/dproto"
+	//"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/dproto"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/handler"
 	"github.com/ircop/ohandler/logger"
@@ -61,7 +62,21 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	}
 
 	//proto := dproto.Protocol_TELNET
-	streamer.SendTask(dproto.PacketType_ALL, dbo.Mgmt, proto, profile, ap.Login, ap.Password, ap.Enable, ap.RoCommunity,
+	// todo: check if MO is not nil
+	streamer.SendBox(dbo.Mgmt, proto, profile, ap.Login, ap.Password, ap.Enable,
+		func(s string){
+			BoxErrorCallback(s, obj)
+			SheduleBox(obj, false)
+		},
+		func(response dproto.BoxResponse) {
+			BoxAnswerCallback(response, obj)
+			SheduleBox(obj, false)
+		},
+		func() {
+			BoxTimeoutCallback(obj)
+			SheduleBox(obj, false)
+		})
+	/*streamer.SendTask(dproto.PacketType_ALL, dbo.Mgmt, proto, profile, ap.Login, ap.Password, ap.Enable, ap.RoCommunity,
 		func(s string) {
 			BoxErrorCallback(s, obj)
 			SheduleBox(obj, false)
@@ -73,11 +88,14 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 		func() {
 			BoxTimeoutCallback(obj)
 			SheduleBox(obj, false)
-		})
+		})*/
 }
 
 // BoxErrorCallback called when task results with global error
 func BoxErrorCallback(errorText string, mo *handler.ManagedObject) {
+	if mo == nil {
+		return
+	}
 	mo.MX.Lock()
 	dbo := mo.DbObject
 	mo.MX.Unlock()
@@ -85,7 +103,10 @@ func BoxErrorCallback(errorText string, mo *handler.ManagedObject) {
 }
 
 // BoxAnswerCallback: will be called after answer for this packet/task is recievwd
-func BoxAnswerCallback (response dproto.Response, mo *handler.ManagedObject) {
+func BoxAnswerCallback (response dproto.BoxResponse, mo *handler.ManagedObject) {
+	if mo == nil {
+		return
+	}
 	mo.MX.Lock()
 	dbo := mo.DbObject
 	mo.MX.Unlock()
@@ -106,6 +127,9 @@ func BoxAnswerCallback (response dproto.Response, mo *handler.ManagedObject) {
 
 // BoxTimeoutCallback: will be called after timeout waiting for NATS task reply
 func BoxTimeoutCallback (mo *handler.ManagedObject) {
+	if mo == nil {
+		return
+	}
 	mo.MX.Lock()
 	dbo := mo.DbObject
 	mo.MX.Unlock()
@@ -115,6 +139,9 @@ func BoxTimeoutCallback (mo *handler.ManagedObject) {
 // todo: re-select this object to sync just in case ( alive , etc. )
 // todo: later all of this updates will not be needed, because all will be changed via this ohandler
 func SheduleBox(mo *handler.ManagedObject, urgent bool) {
+	if mo == nil {
+		return
+	}
 	mo.MX.Lock()
 	dboOld := mo.DbObject
 	mo.MX.Unlock()

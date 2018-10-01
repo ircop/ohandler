@@ -1,7 +1,8 @@
 package taskparser
 
 import (
-	"github.com/ircop/discoverer/dproto"
+	//"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/dproto"
 	"github.com/ircop/ohandler/handler"
 	"github.com/ircop/ohandler/models"
 	"github.com/ircop/ohandler/logger"
@@ -10,15 +11,15 @@ import (
 )
 
 // ParseBoxResult parses response and updates object in DB and memory (if neded)
-func ParseBoxResult(response dproto.Response, mo *handler.ManagedObject, dbo models.Object) {
+func ParseBoxResult(response dproto.BoxResponse, mo *handler.ManagedObject, dbo models.Object) {
 	// check for global error, just in case
-	if response.Type == dproto.PacketType_ERROR {
-		return
-	}
+	//if response.Type == dproto.PacketType_ERROR {
+	//	return
+	//}
 
 	// platform
-	if e, ok := response.Errors[dproto.PacketType_PLATFORM.String()]; ok {
-		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.PacketType_PLATFORM.String(), e)
+	if e, ok := response.Errors[dproto.TaskType_PLATFORM.String()]; ok {
+		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.TaskType_PLATFORM.String(), e)
 	} else {
 		comparePlatform(response.Platform, mo, dbo)
 	}
@@ -29,42 +30,42 @@ func ParseBoxResult(response dproto.Response, mo *handler.ManagedObject, dbo mod
 	mo.MX.Unlock()
 
 	// Interfaces
-	if e, ok := response.Errors[dproto.PacketType_INTERFACES.String()]; ok {
-		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.PacketType_INTERFACES.String(), e)
+	if e, ok := response.Errors[dproto.TaskType_INTERFACES.String()]; ok {
+		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.TaskType_INTERFACES.String(), e)
 	} else {
 		compareInterfaces(response.Interfaces, mo, dbo)
 	}
 
 	// Lldp
-	if e, ok := response.Errors[dproto.PacketType_LLDP.String()]; ok {
-		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.PacketType_LLDP.String(), e)
+	if e, ok := response.Errors[dproto.TaskType_LLDP.String()]; ok {
+		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.TaskType_LLDP.String(), e)
 	} else {
 		compareLldp(response.LldpNeighbors, mo, dbo)
 	}
 
 	// Vlans
-	if e, ok := response.Errors[dproto.PacketType_VLANS.String()]; ok {
-		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.PacketType_VLANS.String(), e)
+	if e, ok := response.Errors[dproto.TaskType_VLANS.String()]; ok {
+		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.TaskType_VLANS.String(), e)
 	} else {
 		processVlans(response.Vlans, mo, dbo)
 	}
 
 	// IPs
-	if e, ok := response.Errors[dproto.PacketType_IPS.String()]; ok {
-		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.PacketType_IPS.String(), e)
+	if e, ok := response.Errors[dproto.TaskType_IPS.String()]; ok {
+		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.TaskType_IPS.String(), e)
 	} else {
 		processIpifs(response.Ipifs, mo, dbo)
 	}
 
 	// UPLINK
-	if e, ok := response.Errors[dproto.PacketType_UPLINK.String()]; ok {
-		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.PacketType_UPLINK.String(), e)
+	if e, ok := response.Errors[dproto.TaskType_UPLINK.String()]; ok {
+		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.TaskType_UPLINK.String(), e)
 	} else {
 		processUplink(response.Uplink, mo, dbo)
 	}
 
-	if e, ok := response.Errors[dproto.PacketType_CONFIG.String()]; ok {
-		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.PacketType_CONFIG.String(), e)
+	if e, ok := response.Errors[dproto.TaskType_CONFIG.String()]; ok {
+		logger.Err("%s: Error in %s: %s", dbo.Name, dproto.TaskType_CONFIG.String(), e)
 	} else {
 		processConfig(response.Config, mo, dbo)
 	}

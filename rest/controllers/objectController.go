@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
-	"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/dproto"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/handler"
 	"github.com/ircop/ohandler/logger"

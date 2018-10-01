@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"github.com/go-pg/pg"
-	"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/dproto"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/logger"
 	"github.com/ircop/ohandler/models"

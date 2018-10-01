@@ -2,8 +2,9 @@ package streamer
 
 import (
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/google/uuid"
-	"github.com/ircop/discoverer/dproto"
+	"github.com/ircop/dproto"
 	"github.com/ircop/ohandler/logger"
 	"github.com/sasha-s/go-deadlock"
 	"time"
@@ -11,6 +12,75 @@ import (
 
 var SendLock deadlock.Mutex
 
+func SendBox(host string, protocol dproto.Protocol, profile dproto.ProfileType, login string, password string, enable string,
+	errorCB func(string), answerCB func(response dproto.BoxResponse), timeoutCB func()) {
+
+	// unique request ID
+	id, err := uuid.NewRandom()
+	if err != nil {
+		logger.Err("Cannot generate task uuid: %s", err.Error())
+		return
+	}
+
+	var port int64 = 22
+	if protocol == dproto.Protocol_TELNET {
+		port = 23
+	}
+
+	message := dproto.BoxRequest{
+		RequestID:	id.String(),
+		// todo: do we need this tout?
+		Timeout:	120,
+		Login:		login,
+		Password:	password,
+		Profile:	profile,
+		Host:		host,
+		Proto:		protocol,
+		Enable:		enable,
+		Port:		port,
+	}
+
+	// bytes of task struct. This will be marshaled into ANY
+	bts, err := proto.Marshal(&message)
+	if err != nil {
+		logger.Err("Cannot marshal task message: %s", err.Error())
+		return
+	}
+
+	wt := WaitingBox{
+		RequestID:	id.String(),
+		ErrorCB:	errorCB,
+		AnswerCB:	answerCB,
+	}
+	wt.Timer = time.AfterFunc(time.Minute * 15, timeoutCB)	// todo: configure wait timer
+	BoxPool.Store(id.String(), &wt)
+
+
+	packet := dproto.DPacket{
+		PacketType:dproto.PacketType_BOX_REQUEST,
+		Payload: &any.Any{
+			TypeUrl:dproto.PacketType_BOX_REQUEST.String(),
+			Value:bts,
+		},
+	}
+
+	packetBts, err := proto.Marshal(&packet)
+	if err != nil {
+		logger.Err("Cannot marshal dproto packet: %s", err.Error())
+		return
+	}
+
+	// send this task
+	SendLock.Lock()
+	defer SendLock.Unlock()
+	//_, err = Nats.Conn.PublishAsync(Nats.TasksChan, bts, func(g string, err error) {
+	_, err = Nats.Conn.PublishAsync(Nats.TasksChan, packetBts, func(g string, err error) {
+		if err != nil {
+			logger.Err("Error recieving NATS ACK: %s", err.Error())
+		}
+	})
+}
+/*
 func SendTask(taskType dproto.PacketType, host string, protocol dproto.Protocol, profile dproto.ProfileType,
 		login string, password string, enable string,community string,
 		errorCB func(string), answerCB func(dproto.Response), timeoutCB func(),
@@ -47,14 +117,14 @@ func SendTask(taskType dproto.PacketType, host string, protocol dproto.Protocol,
 	}
 
 	// Create WaitingTask? Or pass it as argument, and create upper-level?
-	wt := WaitingTask{
+	wt := WaitingBox{
 		RequestID:id.String(),
 		Type:taskType,
 		ErrorCB:errorCB,
 		AnswerCB:answerCB,
 	}
 	wt.Timer = time.AfterFunc(time.Minute * 15, timeoutCB)	// todo: configure this timer
-	TaskPool.Store(id.String(), &wt)
+	BoxPool.Store(id.String(), &wt)
 
 	// send task
 	SendLock.Lock()
@@ -66,4 +136,4 @@ func SendTask(taskType dproto.PacketType, host string, protocol dproto.Protocol,
 			logger.Debug("NATS ACK: %s", g)
 		}
 	})
-}
+}*/
