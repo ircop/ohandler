@@ -2,11 +2,11 @@ package main
 
 import (
 	"flag"
-	"github.com/ircop/ohandler/cfg"
 	"fmt"
-	"github.com/ircop/ohandler/logger"
+	"github.com/ircop/ohandler/cfg"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/handler"
+	"github.com/ircop/ohandler/logger"
 	"github.com/ircop/ohandler/rest"
 	"github.com/ircop/ohandler/streamer"
 	"github.com/ircop/ohandler/tasks"
@@ -58,7 +58,7 @@ func main() {
 		logger.Err("Failed to store discovery profiles: %s", err.Error())
 		return
 	}
-	if err = streamer.Init(config.NatsURL, config.NatsReplies, config.NatsTasks); err != nil {
+	if err = streamer.Init(config.NatsURL, config.NatsReplies, config.NatsTasks, config.NatsDB); err != nil {
 		logger.Err("Failed to init NATS-client: %s", err.Error())
 		return
 	}
@@ -74,6 +74,9 @@ func main() {
 	 }
 
 	 tasks.ScheduleObjects()
+
+	// run db sync, as we have just started
+	streamer.Nats.DbSync(streamer.Nats.DbChan)
 
 	 web := rest.New(config)
 	 logger.Log("Listening RPC...")

@@ -10,6 +10,7 @@ import (
 	"github.com/ircop/ohandler/handler"
 	"github.com/ircop/ohandler/logger"
 	"github.com/ircop/ohandler/models"
+	"github.com/ircop/ohandler/streamer"
 	"github.com/ircop/ohandler/tasks"
 	"net"
 	"regexp"
@@ -364,6 +365,8 @@ func (c *ObjectController) DELETE(ctx *HTTPContext) {
 	mo.(*handler.ManagedObject).BoxTimer.Stop()
 	handler.Objects.Delete(id)
 
+	streamer.UpdatedObject(dbo, 0, true)
+
 	returnOk(ctx.w)
 }
 
@@ -374,6 +377,9 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 		returnError(ctx.w, "Wrong object ID", true)
 		return
 	}
+
+	sendUpdate := false
+	var pingInterval int64 = 0
 
 	moInt, ok := handler.Objects.Load(id)
 	if !ok {
@@ -411,6 +417,13 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 		return
 	}
 
+	if o.Mgmt != params.Mgmt {
+		sendUpdate = true
+	}
+	if o.DiscoveryID != params.DiscID {
+		sendUpdate = true
+	}
+
 	o.Name = params.Name
 	o.Mgmt = params.Mgmt
 	o.AuthID = params.AuthID
@@ -429,6 +442,19 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 	mo.MX.Unlock()
 
 	tasks.SheduleBox(mo, false)
+
+	if sendUpdate {
+		logger.Debug("Sending update about %s", o.Name)
+		// find this discovery id ; find it's ping interval
+		dpInt, ok := handler.DiscoveryProfiles.Load(params.DiscID)
+		if !ok {
+			returnError(ctx.w, "Wrong discovery profile ID", true)
+			return
+		}
+		pingInterval = dpInt.(models.DiscoveryProfile).PingInterval
+
+		go streamer.UpdatedObject(o, pingInterval, false)
+	}
 
 	if err = c.updateSegments(ctx, o); err != nil {
 		returnError(ctx.w, err.Error(), true)
@@ -565,8 +591,18 @@ func (c *ObjectController) POST(ctx *HTTPContext) {
 	handler.Objects.Store(o.ID, &mo)
 
 	tasks.SheduleBox(&mo, true)
-
 	c.updateSegments(ctx, o)
+
+
+	dpInt, ok := handler.DiscoveryProfiles.Load(params.DiscID)
+	if !ok  {
+		logger.Err("Wrong discovery id!")
+		return
+	}
+	dp := dpInt.(models.DiscoveryProfile)
+	go streamer.UpdatedObject(o, dp.PingInterval, false)
+
+
 
 	returnOk(ctx.w)
 }

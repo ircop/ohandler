@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"github.com/go-pg/pg"
 	//"github.com/ircop/discoverer/dproto"
 	"github.com/ircop/dproto"
 	"github.com/ircop/ohandler/db"
@@ -151,6 +152,22 @@ func SheduleBox(mo *handler.ManagedObject, urgent bool) {
 	err := db.DB.Model(&dbo).Where(`id = ?`, dboOld.ID).Select()
 	if err != nil {
 		logger.Err("Scheduler: failed to re-select object '%s': %s", dboOld.Name, err.Error())
+
+		// if object was removed:
+		if err == pg.ErrNoRows {
+			// remove obj from memory
+			if _, ok := handler.Objects.Load(dboOld.ID); ok {
+				mo.MX.Lock()
+				if mo.BoxTimer != nil {
+					mo.BoxTimer.Stop()
+					mo.BoxTimer = nil
+				}
+				mo.MX.Unlock()
+				handler.Objects.Delete(dboOld.ID)
+			}
+			return
+		}
+
 		dbo = dboOld
 	}
 

@@ -9,6 +9,7 @@ type Cfg struct {
 	NatsURL			string
 	NatsTasks		string
 	NatsReplies		string
+	NatsDB			string
 
 	LogDir			string
 
@@ -38,6 +39,7 @@ func NewCfg(path string) (*Cfg, error) {
 	c.NatsURL = viper.GetString("nats.url")
 	c.NatsTasks = viper.GetString("nats.tasks-chan")
 	c.NatsReplies = viper.GetString("nats.replies-chan")
+	c.NatsDB = viper.GetString("nats.db-chan")
 
 	c.DBHost = viper.GetString("db.host")
 	c.DBPort = viper.GetInt("db.port")

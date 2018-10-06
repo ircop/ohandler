@@ -73,67 +73,12 @@ func SendBox(host string, protocol dproto.Protocol, profile dproto.ProfileType, 
 	// send this task
 	SendLock.Lock()
 	defer SendLock.Unlock()
-	//_, err = Nats.Conn.PublishAsync(Nats.TasksChan, bts, func(g string, err error) {
-	_, err = Nats.Conn.PublishAsync(Nats.TasksChan, packetBts, func(g string, err error) {
-		if err != nil {
-			logger.Err("Error recieving NATS ACK: %s", err.Error())
+	_, err = Nats.Conn.PublishAsync(Nats.TasksChan, packetBts, func(g string, e error) {
+		if e != nil {
+			logger.Err("Error recieving NATS ACK: %s", e.Error())
 		}
 	})
+	if err != nil {
+		logger.Err("Failed to send NATS BOX request: %s", err.Error())
+	}
 }
-/*
-func SendTask(taskType dproto.PacketType, host string, protocol dproto.Protocol, profile dproto.ProfileType,
-		login string, password string, enable string,community string,
-		errorCB func(string), answerCB func(dproto.Response), timeoutCB func(),
-	) {
-
-	id, err := uuid.NewRandom()
-	if err != nil {
-		logger.Err("Cannot generate task uuid: %s", err.Error())
-		return
-	}
-
-	port := 22
-	if protocol == dproto.Protocol_TELNET {
-		port = 23
-	}
-
-	message := dproto.TaskRequest{
-		RequestID: 	id.String(),
-		Timeout:   	120,		// todo: do we need this?
-		Login:     	login,
-		Password:	password,
-		Type:		taskType,
-		Profile:	profile,
-		Host:		host,
-		Proto:		protocol,
-		Enable:		enable,
-		Port:		int32(port),
-	}
-
-	bts, err := proto.Marshal(&message)
-	if err != nil {
-		logger.Err("Cannot marshal task message: %s", err.Error())
-		return
-	}
-
-	// Create WaitingTask? Or pass it as argument, and create upper-level?
-	wt := WaitingBox{
-		RequestID:id.String(),
-		Type:taskType,
-		ErrorCB:errorCB,
-		AnswerCB:answerCB,
-	}
-	wt.Timer = time.AfterFunc(time.Minute * 15, timeoutCB)	// todo: configure this timer
-	BoxPool.Store(id.String(), &wt)
-
-	// send task
-	SendLock.Lock()
-	defer SendLock.Unlock()
-	_, err = Nats.Conn.PublishAsync(Nats.TasksChan, bts, func(g string, err error){
-		if err != nil {
-			logger.Err("Error receiving NATS ACK: %s", err.Error())
-		} else {
-			logger.Debug("NATS ACK: %s", g)
-		}
-	})
-}*/

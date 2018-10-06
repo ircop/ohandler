@@ -2,6 +2,7 @@
 url = "nats://discoverer:password@127.0.0.1"
 tasks-chan = "tasks"
 replies-chan = "replies"
+db-chan = "db"
 
 [log]
 dir = "/var/log/ohandler/"
