@@ -21,20 +21,20 @@ func (c *UsersController) GET(ctx *HTTPContext) {
 	}
 	var users []models.User
 	if err := db.DB.Model(&users).OrderExpr(`natsort(login)`).Select(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	result := make(map[string]interface{})
 	result["users"] = users
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 func (c *UsersController) getUser(id int64, ctx *HTTPContext) {
 	var user models.User
 	if err := db.DB.Model(&user).Where(`id = ?`, id).First(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -42,47 +42,47 @@ func (c *UsersController) getUser(id int64, ctx *HTTPContext) {
 	result["login"] = user.Login
 	result["id"] = user.ID
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 // Add user
 func (c *UsersController) POST(ctx *HTTPContext) {
 	required := []string{"login", "password"}
 	if missing := c.CheckParams(ctx, required); len(missing) > 0 {
-		returnError(ctx.w, fmt.Sprintf("Missing parameters: %s", strings.Join(missing, ", ")), true)
+		ReturnError(ctx.W, fmt.Sprintf("Missing parameters: %s", strings.Join(missing, ", ")), true)
 		return
 	}
 
 	reLogin, err := regexp.Compile(`^[a-zA-Z0-9]+$`)
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	login := strings.Trim(ctx.Params["login"], " ")
 	if len(login) < 2 {
-		returnError(ctx.w, "Login len should be 2+ chars", true)
+		ReturnError(ctx.W, "Login len should be 2+ chars", true)
 		return
 	}
 	if !reLogin.Match([]byte(login)) {
-		returnError(ctx.w, "Login should be alphanumeric string", true)
+		ReturnError(ctx.W, "Login should be alphanumeric string", true)
 		return
 	}
 
 	cnt, err := db.DB.Model(&models.User{}).Where(`login = ?`, login).Count()
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	if cnt > 0 {
-		returnError(ctx.w, "This login is already taken", true)
+		ReturnError(ctx.W, "This login is already taken", true)
 		return
 	}
 
 	pw, err := bcrypt.GenerateFromPassword([]byte(strings.Trim(ctx.Params["password"], " ")), bcrypt.DefaultCost)
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -91,11 +91,11 @@ func (c *UsersController) POST(ctx *HTTPContext) {
 		Password:string(pw),
 	}
 	if err = db.DB.Insert(&u); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 // todo: drop user tokens/sessions
@@ -104,19 +104,19 @@ func (c *UsersController) POST(ctx *HTTPContext) {
 func (c *UsersController) PATCH(ctx *HTTPContext) {
 	id, err := c.IntParam(ctx, "id")
 	if err != nil {
-		returnError(ctx.w, "Wrong user ID", true)
+		ReturnError(ctx.W, "Wrong user ID", true)
 		return
 	}
 
 	reLogin, err := regexp.Compile(`^[a-zA-Z0-9]+$`)
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	var user models.User
 	if err := db.DB.Model(&user).Where(`id = ?`, id).First(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -124,14 +124,14 @@ func (c *UsersController) PATCH(ctx *HTTPContext) {
 	newPassword := strings.Trim(ctx.Params["password"], " ")
 	if newPassword != "" {
 		if err = c.checkPW(newPassword); err != nil {
-			returnError(ctx.w, err.Error(), true)
+			ReturnError(ctx.W, err.Error(), true)
 			return
 		}
 
 		// change password
 		newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 		if err != nil {
-			returnError(ctx.w, fmt.Sprintf("Cannot hash new password: %s", err.Error()), true)
+			ReturnError(ctx.W, fmt.Sprintf("Cannot hash new password: %s", err.Error()), true)
 			return
 		}
 
@@ -142,11 +142,11 @@ func (c *UsersController) PATCH(ctx *HTTPContext) {
 	newLogin := strings.Trim(ctx.Params["login"], " ")
 	if newLogin != "" && newLogin != user.Login {
 		if len(newLogin) < 2 {
-			returnError(ctx.w, "Login length should be 2+ chars", true)
+			ReturnError(ctx.W, "Login length should be 2+ chars", true)
 			return
 		}
 		if !reLogin.Match([]byte(newLogin)) {
-			returnError(ctx.w, "Login should be alphanumeric string", true)
+			ReturnError(ctx.W, "Login should be alphanumeric string", true)
 			return
 		}
 
@@ -156,12 +156,12 @@ func (c *UsersController) PATCH(ctx *HTTPContext) {
 
 	if changed {
 		if err = db.DB.Update(&user); err != nil {
-			returnError(ctx.w, err.Error(), true)
+			ReturnError(ctx.W, err.Error(), true)
 			return
 		}
 	}
 
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 func (c *UsersController) checkPW(pw string) error {

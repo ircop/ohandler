@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/go-pg/pg"
 	//"github.com/ircop/discoverer/dproto"
@@ -28,6 +29,7 @@ type Object struct {
 	Version		string		`json:"version"`
  	Serial		string		`json:"serial"`
 	UplinkID	int64		`json:"uplink_id", sql:"uplink_id"`
+	ForeignID	sql.NullInt64	`json:"foreign_id"`
 
 	NextBox		time.Time	`json:"next_box"`
 }

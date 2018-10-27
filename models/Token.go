@@ -13,6 +13,7 @@ type RestToken struct {
 	ID		int64	`json:"id"`
 	Key		string	`json:"key"`
 	UserID	int64	`json:"user_id"`
+	Api		bool	`json:"api"`
 }
 
 func TokenFindOrCreate(uid int64) (*RestToken, error) {
@@ -37,6 +38,7 @@ func TokenFindOrCreate(uid int64) (*RestToken, error) {
 	t := RestToken{
 		UserID:uid,
 		Key: key,
+		Api:false,
 	}
 
 	// write token to DB

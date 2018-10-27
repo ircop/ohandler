@@ -15,7 +15,7 @@ type ConfigsController struct {
 func (c *ConfigsController) GET(ctx *HTTPContext) {
 	oid, err := c.IntParam(ctx, "object_id")
 	if err != nil {
-		returnError(ctx.w, "Wrong object ID", true)
+		ReturnError(ctx.W, "Wrong object ID", true)
 		return
 	}
 
@@ -31,45 +31,45 @@ func (c *ConfigsController) GET(ctx *HTTPContext) {
 		Column(`id`, `created_at`).
 		Select(); err != nil {
 		if err != pg.ErrNoRows {
-			returnError(ctx.w, err.Error(), true)
+			ReturnError(ctx.W, err.Error(), true)
 			return
 		}
 	}
 
 	result := make(map[string]interface{})
 	result["configs"] = configs
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 func (c *ConfigsController) getConfig(id int64, ctx *HTTPContext) {
 	var cfg models.Config
 	if err := db.DB.Model(&cfg).Where(`id = ?`, id).First(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	result := make(map[string]interface{})
 	result["config"] = cfg
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 func (c *ConfigsController) PATCH(ctx *HTTPContext) {
 	firstID, err := c.IntParam(ctx, "first_id")
 	secondID, err2 := c.IntParam(ctx, "second_id")
 	if err != nil || err2 != nil {
-		returnError(ctx.w, "Wrong config ID", true)
+		ReturnError(ctx.W, "Wrong config ID", true)
 		return
 	}
 
 	var first models.Config
 	var second models.Config
 	if err = db.DB.Model(&first).Where(`id = ?`, firstID).First(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	if err = db.DB.Model(&second).Where(`id = ?`, secondID).First(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -82,7 +82,7 @@ func (c *ConfigsController) PATCH(ctx *HTTPContext) {
 
 	diffstr, err := difflib.GetContextDiffString(diff)
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -91,7 +91,7 @@ func (c *ConfigsController) PATCH(ctx *HTTPContext) {
 	result["secondDate"] = second.CreatedAt
 	result["diff"] = diffstr
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 func (с *ConfigsController) prepareConfig(s string) []string {

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"bitbucket.org/zombiezen/cardcpx/natsort"
+	"database/sql"
 	"fmt"
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
@@ -54,13 +55,13 @@ func (c *ObjectController) GetLinks(ctx *HTTPContext, obj models.Object) {
 	var ints []models.Interface
 	_, err := db.DB.Query(&ints, `select * from interfaces where object_id = ? AND (type = ? OR type = ?) order by natsort(name)`, obj.ID, dproto.InterfaceType_PHISYCAL.String(), dproto.InterfaceType_AGGREGATED.String())
 	if err != nil {
-		returnError(ctx.w, err.Error(),true)
+		ReturnError(ctx.W, err.Error(),true)
 		return
 	}
 
 	var links []models.Link
 	if err := db.DB.Model(&links).Where(`object1_id = ?`, obj.ID).WhereOr(`object2_id = ?`, obj.ID).Select(); err != nil {
-		returnError(ctx.w, err.Error(),true)
+		ReturnError(ctx.W, err.Error(),true)
 		return
 	}
 
@@ -83,11 +84,11 @@ func (c *ObjectController) GetLinks(ctx *HTTPContext, obj models.Object) {
 	var interfaces []models.Interface
 	if len(links) > 0 {
 		if err = db.DB.Model(&objects).Where(`id in (?)`, pg.In(objIDs)).Select(); err != nil {
-			returnError(ctx.w, err.Error(), true)
+			ReturnError(ctx.W, err.Error(), true)
 			return
 		}
 		if err = db.DB.Model(&interfaces).Where(`id in (?)`, pg.In(intIDs)).Select(); err != nil {
-			returnError(ctx.w, err.Error(), true)
+			ReturnError(ctx.W, err.Error(), true)
 			return
 		}
 		for i := range objects {
@@ -137,7 +138,7 @@ func (c *ObjectController) GetLinks(ctx *HTTPContext, obj models.Object) {
 
 	result["ifaces"] = ifaces
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 func (c *ObjectController) GetVlans(ctx *HTTPContext, obj models.Object) {
@@ -153,7 +154,7 @@ func (c *ObjectController) GetVlans(ctx *HTTPContext, obj models.Object) {
 			return q, nil
 		}).
 		Select(); err != nil {
-			returnError(ctx.w, err.Error(), true)
+			ReturnError(ctx.W, err.Error(), true)
 			return
 		}
 	intmap := make(map[int64]string)
@@ -164,7 +165,7 @@ func (c *ObjectController) GetVlans(ctx *HTTPContext, obj models.Object) {
 	// select object vlans
 	var ovlans []models.ObjectVlan
 	if err := db.DB.Model(&ovlans).Where(`object_id = ?`, obj.ID).Order(`vid`).Select(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -185,7 +186,7 @@ func (c *ObjectController) GetVlans(ctx *HTTPContext, obj models.Object) {
 
 		ifname, ok := intmap[ovlans[i].InterfaceID]
 		if !ok {
-			returnError(ctx.w, fmt.Sprintf("Cannot find interface by id (%d)", ovlans[i].InterfaceID), true)
+			ReturnError(ctx.W, fmt.Sprintf("Cannot find interface by id (%d)", ovlans[i].InterfaceID), true)
 			return
 		}
 
@@ -219,7 +220,7 @@ func (c *ObjectController) GetVlans(ctx *HTTPContext, obj models.Object) {
 
 	result["vlans"] = vlans
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 func (c *ObjectController) GetInterfaces(ctx *HTTPContext, obj models.Object) {
@@ -237,7 +238,7 @@ func (c *ObjectController) GetInterfaces(ctx *HTTPContext, obj models.Object) {
 	ints := make([]models.Interface, 0)
 	_, err := db.DB.Query(&ints, `select * from interfaces where object_id = ? order by natsort(name)`, obj.ID)
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -266,14 +267,14 @@ func (c *ObjectController) GetInterfaces(ctx *HTTPContext, obj models.Object) {
 	result["virtual"] = virtual
 	result["other"] = other
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 
 func (c *ObjectController) GET(ctx *HTTPContext) {
 	id, err := c.IntParam(ctx, "id")
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -281,10 +282,10 @@ func (c *ObjectController) GET(ctx *HTTPContext) {
 	err = db.DB.Model(&obj).Where(`id = ?`, id).Select()
 	if err != nil {
 		if err == pg.ErrNoRows {
-			notFound(ctx.w)
+			NotFound(ctx.W)
 			return
 		}
-		returnError(ctx.w, fmt.Sprintf("Cannot select object: %s", err.Error()), true)
+		ReturnError(ctx.W, fmt.Sprintf("Cannot select object: %s", err.Error()), true)
 		return
 	}
 
@@ -303,26 +304,26 @@ func (c *ObjectController) GET(ctx *HTTPContext) {
 	// Count interfaces
 	intCount, err := obj.GetInterfacesCount("")
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	// Count vlans
 	var vlanCnt int64
 	if _, err := db.DB.Query(&vlanCnt, `select count(distinct(vid)) from object_vlans where object_id=?`, obj.ID); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	var linkCnt int
 	if linkCnt, err = db.DB.Model(&models.Link{}).Where(`object1_id = ?`, obj.ID).WhereOr(`object2_id = ?`, obj.ID).Count(); err != nil {
-		returnError(ctx.w, err.Error(),true)
+		ReturnError(ctx.W, err.Error(),true)
 		return
 	}
 
 	var segs []models.ObjectSegment
 	if err = db.DB.Model(&segs).Where(`object_id = ?`, obj.ID).Select(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	segments := make([]int64, 0)
@@ -336,20 +337,20 @@ func (c *ObjectController) GET(ctx *HTTPContext) {
 	result["interfaces"] = intCount
 	result["vlans"] = vlanCnt
 	result["links"] = linkCnt
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 // DELETE
 func (c *ObjectController) DELETE(ctx *HTTPContext) {
 	id, err := c.IntParam(ctx, "id")
 	if err != nil {
-		returnError(ctx.w, "Wrong object ID", true)
+		ReturnError(ctx.W, "Wrong object ID", true)
 		return
 	}
 
 	mo, ok := handler.Objects.Load(id)
 	if !ok {
-		notFound(ctx.w)
+		NotFound(ctx.W)
 		return
 	}
 
@@ -358,32 +359,37 @@ func (c *ObjectController) DELETE(ctx *HTTPContext) {
 	logger.Rest("Deleting object %d (%s)", id, dbo.Name)
 
 	if err := db.DB.Delete(&dbo); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	mo.(*handler.ManagedObject).BoxTimer.Stop()
 	handler.Objects.Delete(id)
 
-	streamer.UpdatedObject(dbo, 0, true)
+	streamer.UpdateObject(dbo, true)
 
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 // PUT: update
 func (c *ObjectController) PUT(ctx *HTTPContext) {
 	id, err := c.IntParam(ctx, "id")
 	if err != nil {
-		returnError(ctx.w, "Wrong object ID", true)
+		ReturnError(ctx.W, "Wrong object ID", true)
 		return
 	}
 
+	foreign := sql.NullInt64{Int64:0,Valid:false}
+	if fid, err := c.IntParam(ctx, "foreign_id"); err == nil && fid > 0 {
+		foreign.Int64 = fid
+		foreign.Valid = true
+	}
+
 	sendUpdate := false
-	var pingInterval int64 = 0
 
 	moInt, ok := handler.Objects.Load(id)
 	if !ok {
-		notFound(ctx.w)
+		NotFound(ctx.W)
 		return
 	}
 	mo := moInt.(*handler.ManagedObject)
@@ -391,7 +397,7 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 	o := mo.DbObject
 	params, err := c.checkFields(ctx)
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -399,22 +405,24 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 	// Check uniq name, mgmt
 	cnt, err := db.DB.Model(&models.Object{}).Where(`name = ?`, params.Name).Where(`id <> ?`, id).Count()
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	if cnt > 0 {
-		returnError(ctx.w, "This name is already taken", true)
+		ReturnError(ctx.W, "This name is already taken", true)
 		return
 	}
 
-	cnt, err = db.DB.Model(&models.Object{}).Where(`mgmt = ?`, params.Mgmt).Where(`id <> ?`, id).Count()
-	if err != nil {
-		returnError(ctx.w, err.Error(), true)
-		return
-	}
-	if cnt > 0 {
-		returnError(ctx.w, "This mgmt addr is already taken", true)
-		return
+	if params.Mgmt != "" {
+		cnt, err = db.DB.Model(&models.Object{}).Where(`mgmt = ?`, params.Mgmt).Where(`id <> ?`, id).Count()
+		if err != nil {
+			ReturnError(ctx.W, err.Error(), true)
+			return
+		}
+		if cnt > 0 {
+			ReturnError(ctx.W, "This mgmt addr is already taken", true)
+			return
+		}
 	}
 
 	if o.Mgmt != params.Mgmt {
@@ -429,9 +437,10 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 	o.AuthID = params.AuthID
 	o.ProfileID = int32(params.OsID)
 	o.DiscoveryID = params.DiscID
+	o.ForeignID = foreign
 
 	if err = db.DB.Update(&o); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -445,23 +454,15 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 
 	if sendUpdate {
 		logger.Debug("Sending update about %s", o.Name)
-		// find this discovery id ; find it's ping interval
-		dpInt, ok := handler.DiscoveryProfiles.Load(params.DiscID)
-		if !ok {
-			returnError(ctx.w, "Wrong discovery profile ID", true)
-			return
-		}
-		pingInterval = dpInt.(models.DiscoveryProfile).PingInterval
-
-		go streamer.UpdatedObject(o, pingInterval, false)
+		go streamer.UpdateObject(o, false)
 	}
 
 	if err = c.updateSegments(ctx, o); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 func (c *ObjectController) updateSegments(ctx *HTTPContext, dbo models.Object) error {
@@ -528,51 +529,56 @@ func (c *ObjectController) PATCH(ctx *HTTPContext) {
 	// re-discover
 	id, err := c.IntParam(ctx, "id")
 	if err != nil || id == 0 {
-		returnError(ctx.w, "Wrong object ID", true)
+		ReturnError(ctx.W, "Wrong object ID", true)
 		return
 	}
 
 	moInt, ok := handler.Objects.Load(id)
 	if !ok {
-		notFound(ctx.w)
+		NotFound(ctx.W)
 		return
 	}
 
 	mo := moInt.(*handler.ManagedObject)
 	tasks.SheduleBox(mo, true)
 
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 // ADD
 func (c *ObjectController) POST(ctx *HTTPContext) {
 	params, err := c.checkFields(ctx)
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	// Check uniq name, mgmt
 	cnt, err := db.DB.Model(&models.Object{}).Where(`name = ?`, params.Name).Count()
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	if cnt > 0 {
-		returnError(ctx.w, "This name is already taken", true)
+		ReturnError(ctx.W, "This name is already taken", true)
 		return
 	}
 
 	cnt, err = db.DB.Model(&models.Object{}).Where(`mgmt = ?`, params.Mgmt).Count()
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	if cnt > 0 {
-		returnError(ctx.w, "This mgmt addr is already taken", true)
+		ReturnError(ctx.W, "This mgmt addr is already taken", true)
 		return
 	}
 
+	foreign := sql.NullInt64{Int64:0,Valid:false}
+	if fid, err := c.IntParam(ctx, "foreign_id"); err == nil && fid > 0 {
+		foreign.Int64 = fid
+		foreign.Valid = true
+	}
 
 	o := models.Object{
 		Name:params.Name,
@@ -580,10 +586,11 @@ func (c *ObjectController) POST(ctx *HTTPContext) {
 		AuthID:params.AuthID,
 		DiscoveryID:params.DiscID,
 		ProfileID:int32(params.OsID),
+		ForeignID:foreign,
 	}
 
 	if err := db.DB.Insert(&o); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -594,17 +601,9 @@ func (c *ObjectController) POST(ctx *HTTPContext) {
 	c.updateSegments(ctx, o)
 
 
-	dpInt, ok := handler.DiscoveryProfiles.Load(params.DiscID)
-	if !ok  {
-		logger.Err("Wrong discovery id!")
-		return
-	}
-	dp := dpInt.(models.DiscoveryProfile)
-	go streamer.UpdatedObject(o, dp.PingInterval, false)
+	go streamer.UpdateObject(o, false)
 
-
-
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 func (c *ObjectController) checkFields(ctx *HTTPContext) (objParams, error) {
@@ -620,9 +619,14 @@ func (c *ObjectController) checkFields(ctx *HTTPContext) (objParams, error) {
 		return params, fmt.Errorf("Name length should be > 2 symbols")
 	}
 
-	ip := net.ParseIP(ctx.Params["mgmt"])
-	if ip == nil {
-		return params, fmt.Errorf("Wrong ipv4 for mgmt addr")
+	if ctx.Params["mgmt"] != "" {
+		ip := net.ParseIP(ctx.Params["mgmt"])
+		if ip == nil {
+			return params, fmt.Errorf("Wrong ipv4 for mgmt addr")
+		}
+		params.Mgmt = ip.String()
+	} else {
+		params.Mgmt = ""
 	}
 
 	profileID, err := c.IntParam(ctx, "profile_id")
@@ -650,7 +654,7 @@ func (c *ObjectController) checkFields(ctx *HTTPContext) (objParams, error) {
 	}
 
 	params.Name = name
-	params.Mgmt = ip.String()
+	//params.Mgmt = ip.String()
 	params.OsID = profileID
 	params.DiscID = discID
 	params.AuthID = authID

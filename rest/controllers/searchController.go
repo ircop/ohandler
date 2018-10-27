@@ -18,7 +18,7 @@ func (c *SearchController) POST(ctx *HTTPContext) {
 		c.searchObject(ctx)
 		break
 	default:
-		returnOk(ctx.w)
+		returnOk(ctx.W)
 		return
 	}
 }
@@ -30,7 +30,7 @@ func (c *SearchController) searchObject(ctx *HTTPContext) {
 	query := strings.Trim(ctx.Params["query"],  " ")
 	if query == "" {
 		result["objects"] = objects
-		writeJSON(ctx.w, result)
+		WriteJSON(ctx.W, result)
 		return
 	}
 
@@ -43,11 +43,11 @@ func (c *SearchController) searchObject(ctx *HTTPContext) {
 		Select(); err != nil {
 			if err == pg.ErrNoRows {
 				result["objects"] = objects
-				writeJSON(ctx.w, result)
+				WriteJSON(ctx.W, result)
 				return
 			}
 
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -61,5 +61,5 @@ func (c *SearchController) searchObject(ctx *HTTPContext) {
 	}
 
 	result["objects"] = objects
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }

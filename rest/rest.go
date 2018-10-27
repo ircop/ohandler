@@ -15,6 +15,7 @@ type Rest struct {
 	ssl			bool
 	cert		string
 	key			string
+	dashTemplates	string
 }
 
 func New(cfg *cfg.Cfg) *Rest {
@@ -24,6 +25,7 @@ func New(cfg *cfg.Cfg) *Rest {
 		key:cfg.SslKey,
 		listenIP:cfg.RestIP,
 		listenPort:cfg.RestPort,
+		dashTemplates:cfg.DashTemplates,
 	}
 
 	return &r
@@ -36,7 +38,7 @@ func (r *Rest) Listen() {
 		log.Fatal(err.Error())
 	}
 
-	router := getRouter()
+	router := r.getRouter()
 	if r.ssl {
 		log.Fatal(http.ServeTLS(listener, router, r.cert, r.key))
 	} else {

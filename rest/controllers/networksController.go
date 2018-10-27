@@ -25,18 +25,18 @@ func (c *NetworksController) POST(ctx *HTTPContext) {
 	descr := strings.Trim(ctx.Params["description"], " ")
 
 	if _, _, err := net.ParseCIDR(cidr); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	// search this net
 	cnt, err := db.DB.Model(&models.Network{}).Where(`network = ?`, cidr).Count()
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	if cnt > 0 {
-		returnError(ctx.w, fmt.Sprintf("Network %s already exist.", cidr), true)
+		ReturnError(ctx.W, fmt.Sprintf("Network %s already exist.", cidr), true)
 		return
 	}
 
@@ -47,11 +47,11 @@ func (c *NetworksController) POST(ctx *HTTPContext) {
 		Type:"MANUAL",
 	}
 	if err := db.DB.Insert(&net); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 // get children of  given ID
@@ -77,7 +77,7 @@ func (c *NetworksController) GET(ctx *HTTPContext) {
 			Order(`network`).Select()
 	}
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -91,7 +91,7 @@ func (c *NetworksController) GET(ctx *HTTPContext) {
 		Where(`parent_id in (?)`, pg.In(ids)).
 		Group(`parent_id`).Select()
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -106,5 +106,5 @@ func (c *NetworksController) GET(ctx *HTTPContext) {
 
 	result := make(map[string]interface{})
 	result["nets"] = nets
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }

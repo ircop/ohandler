@@ -36,7 +36,7 @@ func (c *VlansController) searchVlan(str string, ctx *HTTPContext) {
 	}
 	q.Order(`vid`)
 	if err := q.Select(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -44,7 +44,7 @@ func (c *VlansController) searchVlan(str string, ctx *HTTPContext) {
 	result["total"] = len(vlans)
 	result["rows"] = vlans
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 func (c *VlansController) GET(ctx *HTTPContext) {
@@ -86,13 +86,13 @@ func (c *VlansController) GET(ctx *HTTPContext) {
 	cnt, err := db.DB.Model(&models.Vlan{}).Count()
 	if err != nil {
 		logger.RestErr("Cannot select vlans count: %s", err.Error())
-		internalError(ctx.w, err.Error())
+		InternalError(ctx.W, err.Error())
 		return
 	}
 	_, err = db.DB.Query(&vlans, `select * from vlans order by vid limit ? offset ?`, limit, offset)
 	if err != nil {
 		logger.RestErr("Error selecting vlans: %s", err.Error())
-		internalError(ctx.w, err.Error())
+		InternalError(ctx.W, err.Error())
 		return
 	}
 
@@ -112,7 +112,7 @@ func (c *VlansController) GET(ctx *HTTPContext) {
 		Where(`vlan_id in (?)`, pg.In(ids)).
 		Group(`vid`).
 		Select(); err != nil {
-			returnError(ctx.w, err.Error(), true)
+			ReturnError(ctx.W, err.Error(), true)
 			return
 	}
 
@@ -138,7 +138,7 @@ func (c *VlansController) GET(ctx *HTTPContext) {
 	result["total"] = cnt
 	result["rows"] = rows
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 func (c *VlansController) getVlan(id int64, ctx *HTTPContext) {

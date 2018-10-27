@@ -103,7 +103,7 @@ func (c *ObjectsController) GET(ctx *HTTPContext) {
 	cnt, err := db.DB.Model(&models.Object{}).Count()
 	if err != nil {
 		logger.RestErr("Cannot select objects count: %s", err.Error())
-		internalError(ctx.w, err.Error())
+		InternalError(ctx.W, err.Error())
 		return
 	}
 
@@ -112,7 +112,7 @@ func (c *ObjectsController) GET(ctx *HTTPContext) {
 	_, err = db.DB.Query(&objects, `select * from objects order by ` + order + ` limit ? offset ?`, limit, offset)
 	if err != nil {
 		logger.RestErr("Error selecting objects: %s", err.Error())
-		internalError(ctx.w, err.Error())
+		InternalError(ctx.W, err.Error())
 		return
 	}
 
@@ -141,7 +141,7 @@ func (c *ObjectsController) GET(ctx *HTTPContext) {
 		Where(`object_id in (?)`, pg.In(ids)).
 		Group(`object_id`).
 		Select(); err != nil {
-			returnError(ctx.w, err.Error(), true)
+			ReturnError(ctx.W, err.Error(), true)
 			return
 		}
 
@@ -155,7 +155,7 @@ func (c *ObjectsController) GET(ctx *HTTPContext) {
 
 	if err = c.GetInterfaceCounts(rows, ids); err != nil {
 		logger.RestErr("Error selecting int count: %s", err.Error())
-		internalError(ctx.w, err.Error())
+		InternalError(ctx.W, err.Error())
 		return
 	}
 
@@ -164,12 +164,12 @@ func (c *ObjectsController) GET(ctx *HTTPContext) {
 	var lcount2 []linkCount
 	if err := db.DB.Model(&lcount1).ColumnExpr(`object1_id as oid`).ColumnExpr(`count(*) as cnt`).
 		Where(`object1_id in (?)`, pg.In(ids)).Group(`object1_id`).Select(); err != nil {
-			returnError(ctx.w, err.Error(), true)
+			ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	if err := db.DB.Model(&lcount2).ColumnExpr(`object2_id as oid`).ColumnExpr(`count(*) as cnt`).
 		Where(`object2_id in (?)`, pg.In(ids)).Group(`object2_id`).Select(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	for i := range lcount1 {
@@ -193,8 +193,8 @@ func (c *ObjectsController) GET(ctx *HTTPContext) {
 	results := make(map[string]interface{})
 	results["total"] = cnt
 	results["rows"] = rows
-	writeJSON(ctx.w, results)
-	//returnOk(ctx.w)
+	WriteJSON(ctx.W, results)
+	//returnOk(ctx.W)
 }
 
 func (c *ObjectsController) GetInterfaceCounts(rows []map[string]interface{}, ids []int64) error {

@@ -2,6 +2,8 @@ package tasks
 
 import (
 	"github.com/go-pg/pg"
+	"net"
+
 	//"github.com/ircop/discoverer/dproto"
 	"github.com/ircop/dproto"
 	"github.com/ircop/ohandler/db"
@@ -36,6 +38,12 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 	logger.Debug("Running box discovery for %s (%s)", dbo.Name, dbo.Mgmt)
 	if !dbo.Alive {
 		logger.Log("Skipping box discovery for %s: !alive", dbo.Name)
+		SheduleBox(obj, false)
+		return
+	}
+	// check if ip address is valid
+	if ipChech := net.ParseIP(dbo.Mgmt); ipChech == nil {
+		logger.Log("Skipping box discovery for '%s' (#%d): wrong IP", dbo.Name, dbo.ID)
 		SheduleBox(obj, false)
 		return
 	}
@@ -100,7 +108,7 @@ func BoxErrorCallback(errorText string, mo *handler.ManagedObject) {
 	mo.MX.Lock()
 	dbo := mo.DbObject
 	mo.MX.Unlock()
-	logger.Err("Got error on box discovery for %s (%s)", dbo.Name, dbo.Mgmt)
+	logger.Err("Got error on box discovery for %s (%s): %s", dbo.Name, dbo.Mgmt, errorText)
 }
 
 // BoxAnswerCallback: will be called after answer for this packet/task is recievwd

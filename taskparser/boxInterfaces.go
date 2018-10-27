@@ -9,11 +9,14 @@ import (
 	"github.com/ircop/ohandler/logger"
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
+	"github.com/ircop/ohandler/streamer"
 )
 
 // todo: handle multiple interfaces with same name/shortname =\
 // done: db uniques
 func compareInterfaces(news map[string]*dproto.Interface, mo *handler.ManagedObject, dbo models.Object) {
+	var changes int64
+
 	oldIfArr := make([]models.Interface, 0)
 	//oldPoArr := make([]models.PoMember, 0)
 	err := db.DB.Model(&oldIfArr).Where(`object_id = ?`, dbo.ID).Select()
@@ -33,6 +36,7 @@ func compareInterfaces(news map[string]*dproto.Interface, mo *handler.ManagedObj
 		oldIfs[i.Name] = i
 		if _, ok := newIfs[i.Name]; !ok {
 			logger.Update("%s: deleting interface %s", dbo.Name, i.Name)
+			changes++
 			if err = db.DB.Delete(&i); err != nil {
 				logger.Err("Failed to delete interface #%d (%s): %s", i.ID, i.Name, err.Error())
 				logger.Update("Failed to delete interface #%d (%s): %s", i.ID, i.Name, err.Error())
@@ -45,6 +49,7 @@ func compareInterfaces(news map[string]*dproto.Interface, mo *handler.ManagedObj
 		//logger.Debug("-- NEWIFS.NAME: '%s'", name)
 		// todo: compare new+old interface params (descr, lldp id)
 		if old, ok := oldIfs[name]; !ok {
+			changes++
 			logger.Update("%s: adding interface %s", dbo.Name, iface.Name)
 
 			newIf := models.Interface{
@@ -75,13 +80,19 @@ func compareInterfaces(news map[string]*dproto.Interface, mo *handler.ManagedObj
 	}
 
 	// PART II: parse port-channels
-	parsePortchannels(news, mo, dbo)
+	changes += parsePortchannels(news, mo, dbo)
 
+	if changes > 0 {
+		// broadcast object update
+		streamer.UpdateObject(dbo, false)
+	}
 }
 
 // todo: handle multiple PO members with same id =\
 // done: db uniques
-func parsePortchannels(news map[string]*dproto.Interface, mo *handler.ManagedObject, dbo models.Object) {
+func parsePortchannels(news map[string]*dproto.Interface, mo *handler.ManagedObject, dbo models.Object) int64 {
+	var changes int64
+
 	for n, _ := range news {
 		iface := news[n]
 		if iface.Type != dproto.InterfaceType_AGGREGATED {
@@ -120,7 +131,7 @@ func parsePortchannels(news map[string]*dproto.Interface, mo *handler.ManagedObj
 				}).Select()
 			if err != nil {
 				logger.Err("%s: cannot select port-channel '%s' member iface '%s': %s", dbo.Name, iface.Name, name, err.Error())
-				return
+				return changes
 			}
 			discoveredMembers[dbIface.ID] = dbIface
 		}
@@ -132,7 +143,7 @@ func parsePortchannels(news map[string]*dproto.Interface, mo *handler.ManagedObj
 			Where(`po_id = ?`, po.ID).Select()
 		if err != nil && err != pg.ErrNoRows {
 			logger.Err("%s: cannot select port-channel members for po %d: %s", dbo.Name, po.ID, err.Error())
-			return
+			return changes
 		}
 		// also make map
 		dbMembersMap := make(map[int64]models.PoMember, len(DBMembers))
@@ -150,13 +161,14 @@ func parsePortchannels(news map[string]*dproto.Interface, mo *handler.ManagedObj
 		// first we will remove non-existing members from DB
 		for id, dbMember := range dbMembersMap {
 			if _, ok := discoveredMembers[id]; !ok {
+				changes++
 				// we did not discovered current member, so delete it from DB
 				logger.Update("%s: removing member %d from interface %s (%d)", dbo.Name, dbMember.MemberID, iface.Name, po.ID)
 				err := db.DB.Delete(&dbMember)
 				if err != nil && err != pg.ErrNoRows && err != pg.ErrMultiRows {
 					logger.Err("%s: failed to remove member %d from portchannel %s: %s", dbo.Name, dbMember.ID, po.Name, err.Error())
 					logger.Update("%s: failed to remove member %d from portchannel %s: %s", dbo.Name, dbMember.ID, po.Name, err.Error())
-					return
+					return changes
 				}
 			}
 		}
@@ -164,12 +176,13 @@ func parsePortchannels(news map[string]*dproto.Interface, mo *handler.ManagedObj
 		// second, we should add to DB all discovered members, that are not exist in db yet
 		for id, discovered := range discoveredMembers {
 			if _, ok := dbMembersMap[id]; !ok {
+				changes++
 				logger.Update("%s: adding member %s (%d) to port-channel %s (%d)", dbo.Name, discovered.Name, discovered.ID, po.Name, po.ID)
 				newmember := models.PoMember{MemberID:discovered.ID, PoID:po.ID}
 				if err := db.DB.Insert(&newmember); err != nil {
 					logger.Err("%s: failed to insert new po (%s/%d) member (%s/%d): %s", dbo.Name, po.Name, po.ID, discovered.Name, discovered.ID, err.Error())
 					logger.Update("%s: failed to insert new po (%s/%d) member (%s/%d): %s", dbo.Name, po.Name, po.ID, discovered.Name, discovered.ID, err.Error())
-					return
+					return changes
 				}
 			}
 		}
@@ -177,4 +190,6 @@ func parsePortchannels(news map[string]*dproto.Interface, mo *handler.ManagedObj
 		// that's all, folks! lol
 		// todo: revork this stuff, its overcomplicated
 	}
+
+	return changes
 }

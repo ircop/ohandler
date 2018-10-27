@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/ircop/ohandler/models"
 	"golang.org/x/crypto/bcrypt"
+	"net/http"
 	"strings"
+	"time"
 )
 
 // AuthController struct
@@ -16,7 +18,7 @@ type AuthController struct {
 func (c *AuthController) POST(ctx *HTTPContext) {
 	missing := c.CheckParams(ctx, []string{"login", "password"})
 	if len(missing) > 0 {
-		returnError(ctx.w, fmt.Sprintf("Missing parameters: %s", strings.Join(missing, ",")), false)
+		ReturnError(ctx.W, fmt.Sprintf("Missing parameters: %s", strings.Join(missing, ",")), false)
 		return
 	}
 
@@ -29,27 +31,37 @@ func (c *AuthController) POST(ctx *HTTPContext) {
 	//tokenString := ""
 	user, err := models.UserByLogin(login)
 	if err != nil {
-		internalError(ctx.w, err.Error())
+		InternalError(ctx.W, err.Error())
 		return
 	}
 	if user == nil {
-		returnError(ctx.w,"Wrong login or password", false)
+		ReturnError(ctx.W,"Wrong login or password", false)
 		return
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		returnError(ctx.w, "Wrong login or password", false)
+		ReturnError(ctx.W, "Wrong login or password", false)
 		return
 	}
 
 	// create or find token
 	t, err := models.TokenFindOrCreate(user.ID)
 	if err != nil {
-		returnError(ctx.w, err.Error(), false)
+		ReturnError(ctx.W, err.Error(), false)
 		return
 	}
 
-	fmt.Fprintf(ctx.w, `{"token":"%s"}`, t.Key)
+	// set cookie
+	expire := time.Now().AddDate(0,0,1);
+	ck := http.Cookie{
+		Name:"ohandler",
+		Value:t.Key,
+		Expires:expire,
+		HttpOnly:false,
+	}
+	http.SetCookie(ctx.W,&ck)
+
+	fmt.Fprintf(ctx.W, `{"token":"%s"}`, t.Key)
 }
 

@@ -12,24 +12,29 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+	"math"
 )
 
 // HTTPContext definition
 // context is used mostly for parameter passing over requests
 type HTTPContext struct {
-	Ctx		*context.Context
-	r		http.Request
-	w		http.ResponseWriter
-	Params	map[string]string
-	UnauthRoutes	[]string
+	Ctx          	*context.Context
+	R            	http.Request
+	W            	http.ResponseWriter
+	Params       	map[string]string
+	UnauthRoutes 	[]string
+
+	DashTemplates	string
 }
 
 // NewContext returns new HTTPContext instance
-func NewContext(ctx context.Context, r http.Request, w http.ResponseWriter) *HTTPContext {
+func NewContext(ctx context.Context, r http.Request, w http.ResponseWriter, dashTemplates string) *HTTPContext {
 	c := new(HTTPContext)
 	c.Ctx = &ctx
-	c.r = r
-	c.w = w
+	c.R = r
+	c.W = w
+	c.DashTemplates = dashTemplates
 
 	c.Params = make(map[string]string)
 	c.UnauthRoutes = make([]string,0)
@@ -54,28 +59,48 @@ type HTTPController struct {
 
 // Init controller instance
 func (c *HTTPController) Init(ctx *HTTPContext) error {
-	ctx.w.Header().Set("Access-Control-Allow-Origin", "*")
-	ctx.w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PATCH, PUT, DELETE")
-	ctx.w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-	ctx.w.Header().Set("Content-Type", "application/json")
+	if origin := ctx.R.Header.Get("Origin"); origin != "" {
+		ctx.W.Header().Set("Access-Control-Allow-Origin", origin)
+		ctx.W.Header().Set("Access-Control-Allow-Credentials", "true")
+	} else {
+		ctx.W.Header().Set("Access-Control-Allow-Origin", "*")
+	}
+
+	ctx.W.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PATCH, PUT, DELETE")
+	ctx.W.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	ctx.W.Header().Set("Content-Type", "application/json")
 
 	// parse json and query parameters
 	JSONParams := make(map[string]interface{})
-	body, err := ioutil.ReadAll(ctx.r.Body)
+	body, err := ioutil.ReadAll(ctx.R.Body)
 	if nil != err {
 		return err
 	}
-	defer ctx.r.Body.Close() // nolint
+	defer ctx.R.Body.Close() // nolint
 
+//    logger.Debug("json body: '%s'", body)
 	// parse json body if exist
 	err = json.Unmarshal(body, &JSONParams)
 	if nil == err {
 		for k, v := range JSONParams {
 			ctx.Params[k] = fmt.Sprintf("%v", v)
+			switch v.(type) {
+			    case int64:
+				    ctx.Params[k] = fmt.Sprintf("%d", v)
+			    case float64:
+//				    logger.Debug("F64")
+				    if v.(float64) == math.Trunc(v.(float64)) {
+					    // this is int as float
+					    ctx.Params[k] = fmt.Sprintf("%d", int64(v.(float64)))
+//					    logger.Debug("WRITE '%d'", int64(v.(float64)))
+				    } else {
+					    ctx.Params[k] = fmt.Sprintf("%f", v.(float64))
+				    }
+			}
 		}
 	}
 
-	GetParams := ctx.r.URL.Query()
+	GetParams := ctx.R.URL.Query()
 	for param, val := range GetParams {
 		param = strings.ToLower(param)
 		if _, ok := ctx.Params[param]; !ok {
@@ -86,17 +111,17 @@ func (c *HTTPController) Init(ctx *HTTPContext) error {
 	// todo; auth stuff. Here or in middleware?
 	if !c.checkAuth(ctx) {
 		// not authorized
-		ctx.w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
-		http.Error(ctx.w, "Not authorized", http.StatusUnauthorized)
+		ctx.W.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+		http.Error(ctx.W, "Not authorized", http.StatusUnauthorized)
 		return fmt.Errorf("Not authorized")
 	}
 	return nil
 }
 
 func (c *HTTPController) checkAuth(ctx *HTTPContext) bool {
-	uri := ctx.r.RequestURI
+	uri := ctx.R.RequestURI
 
-	if ctx.r.Method == "OPTIONS" {
+	if ctx.R.Method == "OPTIONS" {
 		return true
 	}
 
@@ -110,7 +135,13 @@ func (c *HTTPController) checkAuth(ctx *HTTPContext) bool {
 	// We need a token
 	tokenString, ok := ctx.Params["token"]
 	if !ok {
-		return false
+		ck, err := ctx.R.Cookie("ohandler")
+		if err == nil {
+			tokenString = ck.Value
+		}
+		if tokenString == "" {
+			return false
+		}
 	}
 
 	// todo: CACHE USER TOKENS to 1..5 minutes
@@ -125,11 +156,25 @@ func (c *HTTPController) checkAuth(ctx *HTTPContext) bool {
 		return false
 	}
 
-	if t.UserID != 0 {
+	if t.Api {
 		return true
 	}
 
-	return true
+	if t.UserID != 0 {
+		// set or update cookie
+		expire := time.Now().AddDate(0,0,1);
+		ck := http.Cookie{
+			Name:"ohandler",
+			Value:t.Key,
+			Expires:expire,
+			HttpOnly:false,
+		}
+		http.SetCookie(ctx.W,&ck)
+
+		return true
+	}
+
+	return false
 }
 
 
@@ -162,30 +207,30 @@ func (c *HTTPController) IntParam(ctx *HTTPContext, name string) (int64, error) 
 
 // OPTIONS handler
 func (c *HTTPController) OPTIONS(ctx *HTTPContext) {
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 // DELETE handler
 func (c *HTTPController) DELETE(ctx *HTTPContext) {
-	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
+	http.Error(ctx.W, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 // POST handler
 func (c *HTTPController) POST(ctx *HTTPContext) {
-	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
+	http.Error(ctx.W, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 // POST handler
 func (c *HTTPController) PUT(ctx *HTTPContext) {
-	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
+	http.Error(ctx.W, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 // PATCH handler
 func (c *HTTPController) PATCH(ctx *HTTPContext) {
-	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
+	http.Error(ctx.W, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 // GET handler
 func (c *HTTPController) GET(ctx *HTTPContext) {
-	http.Error(ctx.w, "Method not allowed", http.StatusMethodNotAllowed)
+	http.Error(ctx.W, "Method not allowed", http.StatusMethodNotAllowed)
 }

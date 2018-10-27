@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"github.com/go-pg/pg"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/models"
@@ -24,124 +25,137 @@ func (c *SegmentsController) GET(ctx *HTTPContext) {
 	if err = db.DB.Model(&segs).Order(`title`).Select(); err != nil  {
 		if err == pg.ErrNoRows {
 			result["segments"] = segs
-			writeJSON(ctx.w, result)
+			WriteJSON(ctx.W, result)
 			return
 		}
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	result["segments"] = segs
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 func (c *SegmentsController) getSegment(id int64, ctx *HTTPContext) {
 	var seg models.Segment
 	if err := db.DB.Model(&seg).Where(`id = ?`, id).First(); err != nil {
 		if err == pg.ErrNoRows {
-			notFound(ctx.w)
+			NotFound(ctx.W)
 			return
 		}
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	result := make(map[string]interface{})
 	result["segment"] = seg
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
 
 // add new segment
 func (c *SegmentsController) POST(ctx *HTTPContext) {
 	title := strings.Trim(ctx.Params["title"], " ")
+	foreign := sql.NullInt64{Int64:0,Valid:false}
 	if title == "" {
-		returnError(ctx.w, "Wrong segment name", true)
+		ReturnError(ctx.W, "Wrong segment name", true)
 		return
+	}
+//	fmt.Printf("fid: '%s'\n", ctx.Params["foreign_id"])
+	if fid, err := c.IntParam(ctx, "foreign_id"); err == nil && fid > 0 {
+		foreign.Int64 = fid
+		foreign.Valid = true
 	}
 
 	cnt, err := db.DB.Model(&models.Segment{}).Where(`title = ?`, title).Count()
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	if cnt > 0 {
-		returnError(ctx.w, "There is already segment with this name", true)
+		ReturnError(ctx.W, "There is already segment with this name", true)
 		return
 	}
 
-	seg := models.Segment{Title:title}
+	seg := models.Segment{Title:title, ForeignID:foreign}
 	if err = db.DB.Insert(&seg); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 // rename old segment
 func (c *SegmentsController) PATCH(ctx *HTTPContext) {
 	id, err := c.IntParam(ctx, "id")
 	if err != nil {
-		returnError(ctx.w, "Wrong ID", true)
+		ReturnError(ctx.W, "Wrong ID", true)
 		return
 	}
 	title := strings.Trim(ctx.Params["title"], " ")
 	if title == "" {
-		returnError(ctx.w, "Wrong segment name", true)
+		ReturnError(ctx.W, "Wrong segment name", true)
 		return
+	}
+
+	foreign := sql.NullInt64{Int64:0,Valid:false}
+	if fid, err := c.IntParam(ctx, "foreign_id"); err == nil && fid > 0 {
+		foreign.Int64 = fid
+		foreign.Valid = true
 	}
 
 	// check is title free
 	cnt, err := db.DB.Model(&models.Segment{}).Where(`title = ?`, title).Where(`id <> ?`, id).Count()
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	if cnt > 0 {
-		returnError(ctx.w, "There is already segment with this name", true)
+		ReturnError(ctx.W, "There is already segment with this name", true)
 		return
 	}
 
 	var seg models.Segment
 	if err = db.DB.Model(&seg).Where(`id = ?`, id).First(); err != nil {
 		if err == pg.ErrNoRows {
-			notFound( ctx.w)
+			NotFound( ctx.W)
 			return
 		}
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
 	seg.Title = title
+	seg.ForeignID = foreign
 	if err = db.DB.Update(&seg); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }
 
 func (c *SegmentsController) DELETE(ctx *HTTPContext) {
 	id, err := c.IntParam(ctx, "id")
 	if err != nil {
-		returnError(ctx.w, "Wrong ID", true)
+		ReturnError(ctx.W, "Wrong ID", true)
 		return
 	}
 
 	cnt, err := db.DB.Model(&models.ObjectSegment{}).Where(`segment_id = ?`, id).Count()
 	if err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	if cnt > 0 {
-		returnError(ctx.w, "Cannot delete segment: there are objects bounded.", true)
+		ReturnError(ctx.W, "Cannot delete segment: there are objects bounded.", true)
 		return
 	}
 
 	if _, err = db.DB.Model(&models.Segment{}).Where(`id = ?`, id).Delete(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
-	returnOk(ctx.w)
+	returnOk(ctx.W)
 }

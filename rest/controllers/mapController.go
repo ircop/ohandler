@@ -13,7 +13,7 @@ type MapController struct {
 func (c *MapController) GET(ctx *HTTPContext) {
 	sid, err := c.IntParam(ctx, "segment")
 	if err != nil {
-		returnError(ctx.w, "Wrong segment id", true)
+		ReturnError(ctx.W, "Wrong segment id", true)
 		return
 	}
 
@@ -24,7 +24,7 @@ func (c *MapController) GET(ctx *HTTPContext) {
 			Join(`JOIN object_segments AS s ON s.object_id = object.id`).
 			Where(`s.segment_id = ?`, sid).
 			Select(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 	for i := range objs {
@@ -35,7 +35,7 @@ func (c *MapController) GET(ctx *HTTPContext) {
 			Where(`object1_id in (?)`, pg.In(oids)).
 			WhereOr(`object2_id in (?)`, pg.In(oids)).
 			Select(); err != nil {
-		returnError(ctx.w, err.Error(), true)
+		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
 
@@ -58,5 +58,5 @@ func (c *MapController) GET(ctx *HTTPContext) {
 	result["objects"] = oarr
 	result["links"] = larr
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }

@@ -1,10 +1,12 @@
 package streamer
 
 import (
+	"github.com/go-pg/pg"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/google/uuid"
 	"github.com/ircop/dproto"
+	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/handler"
 	"github.com/ircop/ohandler/logger"
 	"github.com/ircop/ohandler/models"
@@ -30,29 +32,18 @@ func (n *NatsClient) dbPacket(msg *nats.Msg, dbChan string) {
 	}
 }
 
-// Send update event when:
-// - changed mgmt addr
-// - changed ping interval
-// - changed alive?
-func UpdatedObject(dbo models.Object, pingInterval int64, removed bool) {
-	logger.Debug("Broadcasting object #%d (%s) update", dbo.ID, dbo.Name)
-	o := dproto.DBObject{
-		Addr:dbo.Mgmt,
-		ID:dbo.ID,
-		PingInterval:pingInterval,
-		Alive:dbo.Alive,
-		Removed:removed,
+func sendUpdate(objects []*dproto.DBObject) {
+	if len(objects) < 1 {
+		return
 	}
-
 	update := dproto.DBUpdate{
-		Objects:[]*dproto.DBObject{&o},
+		Objects:objects,
 	}
 	bts, err := proto.Marshal(&update)
 	if err != nil {
 		logger.Err("Failed to marshal DB update: %s", err.Error())
 		return
 	}
-
 	packet := dproto.DPacket{
 		PacketType:dproto.PacketType_DB_UPDATE,
 		Payload:&any.Any{
@@ -78,6 +69,110 @@ func UpdatedObject(dbo models.Object, pingInterval int64, removed bool) {
 	}
 }
 
+// Update banch of objects by ids.
+// Separate this function for calling as gorouting
+func UpdateObjects(objects []models.Object, removed bool) {
+	dprofiles, aprofiles := handler.GetProfiles()
+
+
+	DBObjects := make([]*dproto.DBObject, 0)
+	for i := range objects {
+
+		dbo := objects[i]
+		ap, ok := aprofiles[dbo.AuthID]
+		if !ok {
+			logger.Err("Failed to find auth profile for %s (%d)", dbo.Name, dbo.AuthID)
+			continue
+		}
+		dp, ok := dprofiles[dbo.DiscoveryID]
+		if !ok {
+			logger.Err("Failed to find discovery profile for %s (%d)", dbo.Name, dbo.AuthID)
+			continue
+		}
+
+		interfaces := make([]*dproto.PollInterface, 0)
+		o := dproto.DBObject{
+			Addr:dbo.Mgmt,
+			ID:dbo.ID,
+			PingInterval:dp.PingInterval,
+			PollInterval:dp.PeriodicInterval,
+			RoCommunity:ap.RoCommunity,
+			Alive:dbo.Alive,
+			Removed:removed,
+			Interfaces:interfaces,
+		}
+
+		ifs := make([]models.Interface, 0)
+		if err := db.DB.Model(&ifs).Where(`object_id = ?`, dbo.ID).Select(); err != nil && err != pg.ErrNoRows {
+			logger.Err("Cannot select object interfaces: ")
+		} else {
+			for i := range ifs {
+				iface := dproto.PollInterface{
+					ID:ifs[i].ID,
+					Name:ifs[i].Name,
+					Shortname:ifs[i].Shortname,
+				}
+				interfaces = append(interfaces, &iface)
+			}
+			o.Interfaces = interfaces
+		}
+		DBObjects = append(DBObjects, &o)
+	}
+
+	sendUpdate(DBObjects)
+}
+
+// Send update event when:
+// - changed mgmt addr
+// - changed ping interval
+// - changed alive?
+func UpdateObject(dbo models.Object, removed bool) {
+	logger.Debug("Broadcasting object #%d (%s) update", dbo.ID, dbo.Name)
+
+	dpInt, ok := handler.DiscoveryProfiles.Load(dbo.DiscoveryID)
+	if !ok {
+		logger.Err("UpdateObject: failed to find discovery profile for %s (%d)", dbo.Name, dbo.DiscoveryID)
+		return
+	}
+	apInt, ok := handler.AuthProfiles.Load(dbo.AuthID)
+	if !ok {
+		logger.Err("UpdateObject: failed to find auth profile for %s (%d)", dbo.Name, dbo.AuthID)
+		return
+	}
+	dp := dpInt.(models.DiscoveryProfile)
+	ap := apInt.(models.AuthProfile)
+
+	interfaces := make([]*dproto.PollInterface, 0)
+	o := dproto.DBObject{
+		Addr:dbo.Mgmt,
+		ID:dbo.ID,
+		PingInterval:dp.PingInterval,
+		PollInterval:dp.PeriodicInterval,
+		RoCommunity:ap.RoCommunity,
+		Alive:dbo.Alive,
+		Removed:removed,
+		Interfaces:interfaces,
+	}
+	logger.Debug("SENDING DBO: %+#v", o)
+	// get object interfaces
+	ifs := make([]models.Interface, 0)
+	if err := db.DB.Model(&ifs).Where(`object_id = ?`, dbo.ID).Select(); err != nil && err != pg.ErrNoRows {
+		logger.Err("Cannot select object interfaces: ")
+	} else {
+		for i := range ifs {
+			iface := dproto.PollInterface{
+				ID:ifs[i].ID,
+				Name:ifs[i].Name,
+				Shortname:ifs[i].Shortname,
+			}
+			interfaces = append(interfaces, &iface)
+		}
+		o.Interfaces = interfaces
+	}
+
+	sendUpdate([]*dproto.DBObject{&o})
+}
+
 func (n *NatsClient) DbSync(dbChan string) {
 	defer func() {
 		// after end of sync, shedule next sync in 15 minutes.
@@ -92,14 +187,15 @@ func (n *NatsClient) DbSync(dbChan string) {
 	}()
 
 	// send all objects to channel.
-	dprofiles := make(map[int64]models.DiscoveryProfile, 0)
+	//dprofiles := make(map[int64]models.DiscoveryProfile, 0)
 	dbObjects := make([]*dproto.DBObject, 0)
 	// store dprofiles into map
-	handler.DiscoveryProfiles.Range(func(key, dpInt interface{}) bool {
-		dp := dpInt.(models.DiscoveryProfile)
-		dprofiles[dp.ID] = dp
-		return true
-	})
+	//handler.DiscoveryProfiles.Range(func(key, dpInt interface{}) bool {
+	//	dp := dpInt.(models.DiscoveryProfile)
+	//	dprofiles[dp.ID] = dp
+	//	return true
+	//})
+	dprofiles, aprofiles := handler.GetProfiles()
 
 	handler.Objects.Range(func(k, oInt interface{}) bool {
 		mo := oInt.(*handler.ManagedObject)
@@ -112,14 +208,40 @@ func (n *NatsClient) DbSync(dbChan string) {
 			logger.Err("DB SYNC: No discovery profile with id %d for %s", dbo.DiscoveryID, dbo.Name)
 			return true
 		}
-
-		obj := dproto.DBObject{
-			ID:dbo.ID,
-			Alive:dbo.Alive,
-			Addr:dbo.Mgmt,
-			PingInterval:dp.PingInterval,
-			Removed:false,
+		ap, ok := aprofiles[dbo.AuthID]
+		if !ok {
+			logger.Err("DB SYNC: No auth profile with id %d for %s", dbo.AuthID, dbo.Name)
+			return true
 		}
+
+		interfaces := make([]*dproto.PollInterface, 0)
+		obj := dproto.DBObject{
+			Addr:dbo.Mgmt,
+			ID:dbo.ID,
+			PingInterval:dp.PingInterval,
+			PollInterval:dp.PeriodicInterval,
+			RoCommunity:ap.RoCommunity,
+			Alive:dbo.Alive,
+			Removed:false,
+			Interfaces:interfaces,
+		}
+
+		// get object interfaces
+		ifs := make([]models.Interface, 0)
+		if err := db.DB.Model(&ifs).Where(`object_id = ?`, dbo.ID).Select(); err != nil && err != pg.ErrNoRows {
+			logger.Err("Cannot select object interfaces: ")
+		} else {
+			for i := range ifs {
+				iface := dproto.PollInterface{
+					ID:ifs[i].ID,
+					Name:ifs[i].Name,
+					Shortname:ifs[i].Shortname,
+				}
+				interfaces = append(interfaces, &iface)
+			}
+			obj.Interfaces = interfaces
+		}
+
 		dbObjects = append(dbObjects, &obj)
 		return true
 	})

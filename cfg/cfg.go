@@ -25,6 +25,7 @@ type Cfg struct {
 	SslKey     		string
 	Ssl				bool
 	LogDebug		bool
+	DashTemplates	string
 }
 
 // NewCfg reads config with given path
@@ -55,6 +56,7 @@ func NewCfg(path string) (*Cfg, error) {
 	c.Ssl = viper.GetBool("rest.ssl")
 	c.SslCert = viper.GetString("rest.cert")
 	c.SslKey = viper.GetString("rest.key")
+	c.DashTemplates = viper.GetString("rest.dash-templates")
 
 	return c, nil
 }

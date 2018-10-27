@@ -25,5 +25,5 @@ func (c *OsProfilesController) GET(ctx *HTTPContext) {
 
 	result["profiles"] = profiles
 
-	writeJSON(ctx.w, result)
+	WriteJSON(ctx.W, result)
 }
