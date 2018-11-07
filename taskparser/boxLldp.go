@@ -37,6 +37,10 @@ func compareLldp(neighbors []*dproto.LldpNeighbor, mo *handler.ManagedObject, db
 	for i, _ := range neighbors {
 		instance := neighbors[i]
 
+		if instance.ChassisID == "" || instance.PortID == "" {
+			continue
+		}
+
 		// 0: find LOCAL port
 		var localPort models.Interface
 		err := db.DB.Model(&localPort).Where(`object_id = ?`, dbo.ID).

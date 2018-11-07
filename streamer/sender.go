@@ -71,6 +71,7 @@ func SendBox(host string, protocol dproto.Protocol, profile dproto.ProfileType, 
 	}
 
 	// send this task
+	logger.Log("Sending box request '%s'", id.String())
 	SendLock.Lock()
 	defer SendLock.Unlock()
 	_, err = Nats.Conn.PublishAsync(Nats.TasksChan, packetBts, func(g string, e error) {

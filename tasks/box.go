@@ -85,19 +85,6 @@ func BoxDiscovery(obj *handler.ManagedObject) {
 			BoxTimeoutCallback(obj)
 			SheduleBox(obj, false)
 		})
-	/*streamer.SendTask(dproto.PacketType_ALL, dbo.Mgmt, proto, profile, ap.Login, ap.Password, ap.Enable, ap.RoCommunity,
-		func(s string) {
-			BoxErrorCallback(s, obj)
-			SheduleBox(obj, false)
-		},
-		func(response dproto.Response) {
-			BoxAnswerCallback(response, obj)
-			SheduleBox(obj, false)
-		},
-		func() {
-			BoxTimeoutCallback(obj)
-			SheduleBox(obj, false)
-		})*/
 }
 
 // BoxErrorCallback called when task results with global error
@@ -130,7 +117,6 @@ func BoxAnswerCallback (response dproto.BoxResponse, mo *handler.ManagedObject) 
 		}
 	}()
 
-	// todo: parse box discovery answer: platform ; interfaces ; lldp ; ips ; etc......
 	taskparser.ParseBoxResult(response, mo, dbo)
 }
 

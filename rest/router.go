@@ -30,6 +30,7 @@ func (r *Rest) getRouter() *mux.Router {
 	router.HandleFunc("/segments", r.obs(&controllers.SegmentsController{}))
 	router.HandleFunc("/configs", r.obs(&controllers.ConfigsController{}))
 	router.HandleFunc("/keys", r.obs(&controllers.ApiKeysController{}))
+	router.HandleFunc("/models", r.obs(&controllers.ModelsController{}))
 
 	router.HandleFunc("/dash/port", r.obs(&dash.PortController{}))
 	router.HandleFunc("/dash/object", r.obs(&dash.ObjectController{}))
