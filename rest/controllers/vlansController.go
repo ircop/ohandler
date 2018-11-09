@@ -41,8 +41,38 @@ func (c *VlansController) searchVlan(str string, ctx *HTTPContext) {
 	}
 
 	result := make(map[string]interface{})
+
+	ids := make([]int64,0)
+	for i := range vlans {
+		ids = append(ids, vlans[i].ID)
+	}
+	var vObjs []vlanObjects
+	if err := db.DB.Model(&vObjs).Column(`vid`).ColumnExpr(`count(distinct(object_id)) as cnt`).
+		Where(`vlan_id in (?)`, pg.In(ids)).
+		Group(`vid`).
+		Select(); err != nil {
+			ReturnError(ctx.W, err.Error(), true)
+			return
+		}
+
+	rows := make([]map[string]interface{}, 0)
+	for i := range vlans {
+		item := make(map[string]interface{})
+		item["id"] = vlans[i].ID
+		item["vid"] = vlans[i].Vid
+		item["name"] = vlans[i].Name
+		item["descr"] = vlans[i].Description
+		item["objects"] = 0
+
+		for n := range vObjs {
+			if vObjs[n].VID == vlans[i].Vid {
+				item["objects"] = vObjs[n].Objects
+			}
+		}
+		rows = append(rows, item)
+	}
+	result["rows"] = rows
 	result["total"] = len(vlans)
-	result["rows"] = vlans
 
 	WriteJSON(ctx.W, result)
 }
@@ -96,12 +126,6 @@ func (c *VlansController) GET(ctx *HTTPContext) {
 		return
 	}
 
-	/*rowsMap := make(map[int64]models.Vlan)
-	ids := make([]int64,0)
-	for i := range vlans {
-		rowsMap[vlans[i].Vid] = vlans[i]
-		ids = append(ids, vlans[i].ID)
-	}*/
 	ids := make([]int64,0)
 	for i := range vlans {
 		ids = append(ids, vlans[i].ID)

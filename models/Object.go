@@ -45,7 +45,9 @@ func (o *Object) GetInterfacesCount(intType string) (int, error) {
 
 func ObjectsAll() ([]Object, error) {
 	var objects []Object
-	err := db.DB.Model(&objects).Select()
+	err := db.DB.Model(&objects).
+		//Where(`mgmt = ?`, `109.206.159.150`).WhereOr(`mgmt = ?`, `172.31.31.199`).
+		Select()
 	if err != nil && err != pg.ErrNoRows {
 		return objects, err
 	}

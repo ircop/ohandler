@@ -150,6 +150,13 @@ func (c *ObjectsController) POST(ctx *HTTPContext) {
 		InternalError(ctx.W, err.Error())
 		return
 	}
+	if cnt == 0 {
+		results := make(map[string]interface{})
+		results["total"] = cnt
+		results["rows"] = make([]string,0)
+		WriteJSON(ctx.W, results)
+		return
+	}
 
 	// third, form ORDER clause and select objects
 	oField := ctx.Params["sortField"]
@@ -190,6 +197,10 @@ func (c *ObjectsController) POST(ctx *HTTPContext) {
 
 	err = query.Limit(int(limit)).Offset(int(offset)).Select()
 	if err != nil {
+		if err == pg.ErrNoRows {
+			NotFound(ctx.W)
+			return
+		}
 		logger.RestErr(`Cannot select objects: %s`, err.Error())
 		InternalError(ctx.W, err.Error())
 	}

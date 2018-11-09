@@ -3,7 +3,7 @@ package models
 import "time"
 
 type Vlan struct {
-	TableName struct{} `sql:"vlans"`
+	TableName struct{} `sql:"vlans" json:"-"`
 
 	ID				int64		`json:"id"`
 	Vid				int64		`json:"vid"`

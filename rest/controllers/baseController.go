@@ -81,6 +81,7 @@ func (c *HTTPController) Init(ctx *HTTPContext) error {
 //    logger.Debug("json body: '%s'", body)
 	// parse json body if exist
 	err = json.Unmarshal(body, &JSONParams)
+	//logger.Debug("-- jsonparams -- '%+v'", JSONParams)
 	if nil == err {
 		for k, v := range JSONParams {
 			ctx.Params[k] = fmt.Sprintf("%v", v)

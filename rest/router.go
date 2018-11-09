@@ -22,6 +22,7 @@ func (r *Rest) getRouter() *mux.Router {
 	router.HandleFunc("/discovery-profiles", r.obs(&controllers.DiscoveryProfileController{}))
 	router.HandleFunc("/account", r.obs(&controllers.AccountController{}))
 	router.HandleFunc("/users", r.obs(&controllers.UsersController{}))
+	router.HandleFunc("/vlan", r.obs(&controllers.VlanController{}))
 	router.HandleFunc("/vlans", r.obs(&controllers.VlansController{}))
 	router.HandleFunc("/networks", r.obs(&controllers.NetworksController{}))
 	router.HandleFunc("/map", r.obs(&controllers.MapController{}))
