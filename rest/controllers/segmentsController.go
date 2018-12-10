@@ -72,13 +72,28 @@ func (c *SegmentsController) POST(ctx *HTTPContext) {
 		ReturnError(ctx.W, err.Error(), true)
 		return
 	}
-
 	if cnt > 0 {
 		ReturnError(ctx.W, "There is already segment with this name", true)
 		return
 	}
 
-	seg := models.Segment{Title:title, ForeignID:foreign}
+	// check if there is already segment with same foreign ID
+	if foreign.Valid && foreign.Int64 != 0 {
+		cnt, err := db.DB.Model(&models.Segment{}).Where(`foreign_id = ?`, foreign.Int64).Count()
+		if err != nil {
+			ReturnError(ctx.W, err.Error(), true)
+			return
+		}
+		if cnt > 0 {
+			ReturnError(ctx.W, "There is already segment with this foreign_id", true)
+			return
+		}
+	}
+
+	seg := models.Segment{Title:title, ForeignID:foreign, Trash:false}
+	if ctx.Params["trash"] == "true" {
+		seg.Trash = true
+	}
 	if err = db.DB.Insert(&seg); err != nil {
 		ReturnError(ctx.W, err.Error(), true)
 		return
@@ -128,6 +143,11 @@ func (c *SegmentsController) PATCH(ctx *HTTPContext) {
 
 	seg.Title = title
 	seg.ForeignID = foreign
+	if ctx.Params["trash"] == "true" {
+		seg.Trash = true
+	} else {
+		seg.Trash = false
+	}
 	if err = db.DB.Update(&seg); err != nil {
 		ReturnError(ctx.W, err.Error(), true)
 		return

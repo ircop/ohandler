@@ -32,6 +32,7 @@ func (r *Rest) getRouter() *mux.Router {
 	router.HandleFunc("/configs", r.obs(&controllers.ConfigsController{}))
 	router.HandleFunc("/keys", r.obs(&controllers.ApiKeysController{}))
 	router.HandleFunc("/models", r.obs(&controllers.ModelsController{}))
+	router.HandleFunc("/discovery-problems", r.obs(&controllers.DiscoveryProblemsController{}))
 
 	router.HandleFunc("/dash/port", r.obs(&dash.PortController{}))
 	router.HandleFunc("/dash/object", r.obs(&dash.ObjectController{}))
@@ -43,7 +44,7 @@ func (r *Rest) getRouter() *mux.Router {
 func (r *Rest) obs(handler controllers.Controller) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := context.Background()
-		httpContext := controllers.NewContext(ctx, *req, w, r.dashTemplates)
+		httpContext := controllers.NewContext(ctx, *req, w, r.config)
 
 		httpContext.UnauthRoutes = append(httpContext.UnauthRoutes, "/login")
 		httpContext.UnauthRoutes = append(httpContext.UnauthRoutes, "/ping")

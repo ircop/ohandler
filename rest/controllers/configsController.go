@@ -49,7 +49,7 @@ func (c *ConfigsController) getConfig(id int64, ctx *HTTPContext) {
 	}
 
 	result := make(map[string]interface{})
-	result["config"] = cfg
+	result["Config"] = cfg
 
 	WriteJSON(ctx.W, result)
 }
@@ -58,7 +58,7 @@ func (c *ConfigsController) PATCH(ctx *HTTPContext) {
 	firstID, err := c.IntParam(ctx, "first_id")
 	secondID, err2 := c.IntParam(ctx, "second_id")
 	if err != nil || err2 != nil {
-		ReturnError(ctx.W, "Wrong config ID", true)
+		ReturnError(ctx.W, "Wrong Config ID", true)
 		return
 	}
 

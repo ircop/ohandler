@@ -8,4 +8,5 @@ type Segment struct {
 	ID			int64			`json:"id" sql:"id"`
 	Title		string			`json:"title" sql:"title"`
 	ForeignID	sql.NullInt64	`json:"foreign_id"`
+	Trash		bool			`json:"trash" sql:",notnull"`
 }

@@ -21,7 +21,7 @@ type Object struct {
 	OsID		int64		`json:"os_id"`
 	CreatedAT	time.Time	`json:"created_at"`
 	DeletedAT	time.Time	`json:"deleted_at"`
-	Alive		bool		`json:"alive"`
+	Alive		bool		`json:"alive" sql:",notnull"`
 	ProfileID	int32		`json:"profile_id" sql:",notnull"`
 
 	Model		string		`json:"model"`
@@ -62,3 +62,4 @@ func (o *Object) GetProfile() (dproto.ProfileType, error) {
 
 	return dproto.ProfileType(o.ProfileID), nil
 }
+

@@ -31,7 +31,7 @@ func (c *PortController) GET(ctx *controllers.HTTPContext) {
 		}
 	}
 
-	tpl, err := template.ParseFiles(fmt.Sprintf("%s/port-panel.json", ctx.DashTemplates))
+	tpl, err := template.ParseFiles(fmt.Sprintf("%s/port-panel.json", ctx.Config.DashTemplates))
 	if err != nil {
 		controllers.ReturnError(ctx.W, err.Error(), true)
 		return

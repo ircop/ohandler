@@ -40,6 +40,8 @@ type objParams struct {
 	OsID	int64
 	AuthID	int64
 	DiscID	int64
+
+	Trash	bool
 }
 
 type vlanInts struct {
@@ -413,7 +415,7 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 		return
 	}
 
-	if params.Mgmt != "" {
+	if params.Mgmt != "" && !params.Trash {
 		cnt, err = db.DB.Model(&models.Object{}).Where(`mgmt = ?`, params.Mgmt).Where(`id <> ?`, id).Count()
 		if err != nil {
 			ReturnError(ctx.W, err.Error(), true)
@@ -465,13 +467,28 @@ func (c *ObjectController) PUT(ctx *HTTPContext) {
 	returnOk(ctx.W)
 }
 
+func (c *ObjectController) parseSegmentIDs(ctx *HTTPContext) ([]int64) {
+	re := regexp.MustCompile(`(\d+)`)
+	matches := re.FindAllStringSubmatch(ctx.Params["segments"], -1)
+	newSegs := make([]int64, 0)
+	for i := range matches{
+		sInt := matches[i][0]
+		segID, err := strconv.ParseInt(sInt, 10, 64)
+		if err == nil {
+			newSegs = append(newSegs, segID)
+		}
+	}
+
+	return newSegs
+}
+
 func (c *ObjectController) updateSegments(ctx *HTTPContext, dbo models.Object) error {
 	// compare segments
 	var oldSegs []models.ObjectSegment
 	if err := db.DB.Model(&oldSegs).Where(`object_id = ?`, dbo.ID).Select(); err != nil {
 		return err
 	}
-	newSegs := make([]int64, 0)
+	/*newSegs := make([]int64, 0)
 	re, err := regexp.Compile(`(\d+)`)
 	if err != nil {
 		return err
@@ -484,10 +501,15 @@ func (c *ObjectController) updateSegments(ctx *HTTPContext, dbo models.Object) e
 		if err == nil {
 			newSegs = append(newSegs, segID)
 		}
-	}
+	}*/
+	newSegs := c.parseSegmentIDs(ctx)
+
+	//logger.Debug("NEW SEGS: %v", newSegs)
+	//logger.Debug("OLD SEGS: %+v", oldSegs)
 
 	// remove old and add new segments
 	for i := range newSegs {
+		//logger.Debug(" -- new seg: %d", newSegs[i])
 		found := false
 		for j := range oldSegs {
 			if oldSegs[j].SegmentID == newSegs[i] {
@@ -499,7 +521,7 @@ func (c *ObjectController) updateSegments(ctx *HTTPContext, dbo models.Object) e
 		if !found {
 			// add new segment
 			s := models.ObjectSegment{SegmentID:newSegs[i], ObjectID:dbo.ID}
-			if err = db.DB.Insert(&s); err != nil {
+			if err := db.DB.Insert(&s); err != nil {
 				return err
 			}
 		}
@@ -515,7 +537,7 @@ func (c *ObjectController) updateSegments(ctx *HTTPContext, dbo models.Object) e
 		}
 		// remove old segment
 		if !found {
-			if _, err = db.DB.Model(&models.ObjectSegment{}).Where(`id = ?`, oldSegs[i].ID).Delete(); err != nil {
+			if _, err := db.DB.Model(&models.ObjectSegment{}).Where(`id = ?`, oldSegs[i].ID).Delete(); err != nil {
 				return err
 			}
 		}
@@ -564,14 +586,16 @@ func (c *ObjectController) POST(ctx *HTTPContext) {
 		return
 	}
 
-	cnt, err = db.DB.Model(&models.Object{}).Where(`mgmt = ?`, params.Mgmt).Count()
-	if err != nil {
-		ReturnError(ctx.W, err.Error(), true)
-		return
-	}
-	if cnt > 0 {
-		ReturnError(ctx.W, "This mgmt addr is already taken", true)
-		return
+	if !params.Trash {
+		cnt, err = db.DB.Model(&models.Object{}).Where(`mgmt = ?`, params.Mgmt).Count()
+		if err != nil {
+			ReturnError(ctx.W, err.Error(), true)
+			return
+		}
+		if cnt > 0 {
+			ReturnError(ctx.W, "This mgmt addr is already taken", true)
+			return
+		}
 	}
 
 	foreign := sql.NullInt64{Int64:0,Valid:false}
@@ -607,9 +631,41 @@ func (c *ObjectController) POST(ctx *HTTPContext) {
 }
 
 func (c *ObjectController) checkFields(ctx *HTTPContext) (objParams, error) {
-	params := objParams{}
+	params := objParams{Trash:false}
 
-	required := []string{"name", "mgmt", "profile_id", "auth_id", "discovery_id"}
+	///////////
+	// Check if object is in TRASH segment
+	///////////
+	segIDs := c.parseSegmentIDs(ctx)
+	if len(segIDs) > 0 {
+		// check if there is trash segment...
+		segments := make([]models.Segment,0)
+		//if err = db.DB.Model(&objects).Where(`id in (?)`, pg.In(objIDs)).Select(); err != nil {
+		err := db.DB.Model(&segments).Where(`id in (?)`, pg.In(segIDs)).Select()
+		if err != nil {
+			return params, fmt.Errorf("Cannot select segments: %s", err.Error())
+		}
+
+		// is there trash segment?
+		for i := range segments {
+			if segments[i].Trash {
+				// trash!
+				params.Trash = true
+				params.Mgmt = ""
+				if len(segments) > 1 {
+					return params, fmt.Errorf("If object is in trash segment, only one segment allowed.")
+				}
+			}
+		}
+	}
+
+
+	var required []string
+	if params.Trash {
+		required = []string{"name", "profile_id", "auth_id", "discovery_id"}
+	} else {
+		required = []string{"name", "mgmt", "profile_id", "auth_id", "discovery_id"}
+	}
 	if missing := c.CheckParams(ctx, required); len(missing) > 0 {
 		return params, fmt.Errorf("Missing required parameters: %s", strings.Join(missing, ", "))
 	}
@@ -619,7 +675,7 @@ func (c *ObjectController) checkFields(ctx *HTTPContext) (objParams, error) {
 		return params, fmt.Errorf("Name length should be > 2 symbols")
 	}
 
-	if ctx.Params["mgmt"] != "" {
+	if ctx.Params["mgmt"] != "" && !params.Trash {
 		ip := net.ParseIP(ctx.Params["mgmt"])
 		if ip == nil {
 			return params, fmt.Errorf("Wrong ipv4 for mgmt addr")
@@ -634,7 +690,7 @@ func (c *ObjectController) checkFields(ctx *HTTPContext) (objParams, error) {
 		return params, fmt.Errorf( "Wrong Device profile ID")
 	}
 	if _, ok := dproto.ProfileType_name[int32(profileID)]; !ok {
-		return params, fmt.Errorf("Wrong Device profile ID")
+		return params, fmt.Errorf("Wrong Device profile ID (%d)", int32(profileID))
 	}
 
 	authID, err := c.IntParam(ctx, "auth_id")

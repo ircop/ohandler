@@ -57,7 +57,7 @@ func (c *ObjectController) GET(ctx *controllers.HTTPContext) {
 			return
 		}
 	}
-	tplPort, err := template.ParseFiles(fmt.Sprintf("%s/port-row.json", ctx.DashTemplates))
+	tplPort, err := template.ParseFiles(fmt.Sprintf("%s/port-row.json", ctx.Config.DashTemplates))
 	if err != nil {
 		controllers.ReturnError(ctx.W, err.Error(), true)
 		return
@@ -74,7 +74,7 @@ func (c *ObjectController) GET(ctx *controllers.HTTPContext) {
 
 	data.Ports = strings.Join(portParts, ",")
 
-	tpl, err := template.ParseFiles(fmt.Sprintf("%s/object-panel.json", ctx.DashTemplates))
+	tpl, err := template.ParseFiles(fmt.Sprintf("%s/object-panel.json", ctx.Config.DashTemplates))
 	if err != nil {
 		controllers.ReturnError(ctx.W, err.Error(), true)
 		return

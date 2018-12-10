@@ -50,16 +50,17 @@ type linkCount struct {
 }
 
 func (c *ObjectsController) formatWhere(ctx *HTTPContext, query *orm.Query) {
+	re, err := regexp.Compile(`(\d+)`)
+	if err != nil {
+		logger.RestErr("Cannot compile \\d+ regex: %s", err.Error())
+		return
+	}
+
 	ipname := strings.Trim(ctx.Params["ipname"], " ")
 
 	// find out segments, if any
 	segString := ctx.Params["segments"]
 	if segString != "" && segString != "[]" {
-		re, err := regexp.Compile(`(\d+)`)
-		if err != nil {
-			logger.RestErr("Cannot compile \\d+ regex: %s", err.Error())
-			return
-		}
 
 		matches := re.FindAllStringSubmatch(segString, -1)
 		segmentIDs := make([]int64,0)
@@ -112,6 +113,45 @@ func (c *ObjectsController) formatWhere(ctx *HTTPContext, query *orm.Query) {
 				return q, nil
 			})
 		}
+	}
+
+	dproblems := strings.Trim(ctx.Params["dproblems"], " ")
+	if dproblems != "" && dproblems != "[]" {
+		matches := re.FindAllStringSubmatch(dproblems, -1)
+		for i := range matches {
+			idStr := matches[i][0]
+			code, err := strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				continue
+			}
+
+			switch code {
+			case int64(dproto.DiscoveryProblem_NO_NEIGHBORS):
+				query.Join(`LEFT JOIN lldp_neighbors n1 on n1.neighbor_id = object.id`).
+					Join(`LEFT JOIN lldp_neighbors n2 on n2.object_id = object.id`).
+					Where(`n1.id IS NULL`).Where(`n2.id IS NULL`)
+				break
+			case int64(dproto.DiscoveryProblem_NO_VLANS):
+				query.Join(`LEFT JOIN object_vlans ovc on ovc.object_id = object.id`).
+					Where(`ovc.id IS NULL`)
+				break
+			case int64(dproto.DiscoveryProblem_NO_UPLINK):
+				query.Where(`object.uplink_id IS NULL`)
+				break
+			case int64(dproto.DiscoveryProblem_NO_INTERFACES):
+				query.Join(`LEFT JOIN interfaces ifs ON ifs.object_id = object.id`).
+					Where(`ifs.id IS NULL`)
+				break
+			}
+		}
+	}
+
+	alive := strings.Trim(ctx.Params["alive"], " ")
+	if alive == "true" {
+		query.Where(`alive = ?`, true)
+	}
+	if alive == "false" {
+		query.Where(`alive = ?`, false)
 	}
 }
 
@@ -186,14 +226,6 @@ func (c *ObjectsController) POST(ctx *HTTPContext) {
 		query.Order(`id ASC`)
 		break
 	}
-
-//	cnt, err := db.DB.Model(&models.Object{}).Count()
-	/*cnt, err := query.Count()
-	if err != nil {
-		logger.RestErr(`Cannot select objects count: %s`, err.Error())
-		InternalError(ctx.W, err.Error())
-		return
-	}*/
 
 	err = query.Limit(int(limit)).Offset(int(offset)).Select()
 	if err != nil {

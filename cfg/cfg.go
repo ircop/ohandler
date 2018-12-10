@@ -26,6 +26,9 @@ type Cfg struct {
 	Ssl				bool
 	LogDebug		bool
 	DashTemplates	string
+
+	GrafanaURL		string
+	GrafanaKey		string
 }
 
 // NewCfg reads config with given path
@@ -57,6 +60,9 @@ func NewCfg(path string) (*Cfg, error) {
 	c.SslCert = viper.GetString("rest.cert")
 	c.SslKey = viper.GetString("rest.key")
 	c.DashTemplates = viper.GetString("rest.dash-templates")
+
+	c.GrafanaURL = viper.GetString("grafana.url")
+	c.GrafanaKey = viper.GetString("grafana.key")
 
 	return c, nil
 }

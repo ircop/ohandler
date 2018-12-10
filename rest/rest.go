@@ -15,7 +15,8 @@ type Rest struct {
 	ssl			bool
 	cert		string
 	key			string
-	dashTemplates	string
+	config		*cfg.Cfg
+//	dashTemplates	string
 }
 
 func New(cfg *cfg.Cfg) *Rest {
@@ -25,7 +26,7 @@ func New(cfg *cfg.Cfg) *Rest {
 		key:cfg.SslKey,
 		listenIP:cfg.RestIP,
 		listenPort:cfg.RestPort,
-		dashTemplates:cfg.DashTemplates,
+		config:cfg,
 	}
 
 	return &r

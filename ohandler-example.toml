@@ -15,6 +15,10 @@ name = "nms"
 user = "nms"
 password = "password
 
+[grafana]
+url = "https://grafana.x.y:3001/"
+key = "eyJrIjoie=====fdedrtyk"
+
 [rest]
 ip = "0.0.0.0"
 port = 1088

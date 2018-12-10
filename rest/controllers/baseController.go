@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-pg/pg"
+	"github.com/ircop/ohandler/cfg"
 	"github.com/ircop/ohandler/db"
 	"github.com/ircop/ohandler/logger"
 	"github.com/ircop/ohandler/models"
@@ -25,16 +26,18 @@ type HTTPContext struct {
 	Params       	map[string]string
 	UnauthRoutes 	[]string
 
-	DashTemplates	string
+	//DashTemplates	string
+	Config *cfg.Cfg
 }
 
 // NewContext returns new HTTPContext instance
-func NewContext(ctx context.Context, r http.Request, w http.ResponseWriter, dashTemplates string) *HTTPContext {
+func NewContext(ctx context.Context, r http.Request, w http.ResponseWriter, config *cfg.Cfg) *HTTPContext {
 	c := new(HTTPContext)
 	c.Ctx = &ctx
 	c.R = r
 	c.W = w
-	c.DashTemplates = dashTemplates
+	//c.DashTemplates = dashTemplates
+	c.Config = config
 
 	c.Params = make(map[string]string)
 	c.UnauthRoutes = make([]string,0)
